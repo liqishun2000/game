@@ -1,12 +1,13 @@
 ﻿using Microsoft.Extensions.Logging;
+using MauiAppHost = global::Microsoft.Maui.Hosting.MauiApp;
 
 namespace MauiApp;
 
 public static class MauiProgram
 {
-    public static MauiApp CreateMauiApp()
+    public static MauiAppHost CreateMauiApp()
     {
-        var builder = MauiApp.CreateBuilder();
+        var builder = MauiAppHost.CreateBuilder();
         builder
             .UseMauiApp<App>()
             .ConfigureFonts(fonts =>
