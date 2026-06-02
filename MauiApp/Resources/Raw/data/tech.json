@@ -1,0 +1,16 @@
+[
+  {
+    "id": "forging_1",
+    "name": "锻造术",
+    "cost": { "techPoints": 100 },
+    "prereqIds": [],
+    "unlocks": { "equipmentIds": ["tie_jia", "gang_dao"], "unitIds": [], "buildingIds": [] }
+  },
+  {
+    "id": "logistics_1",
+    "name": "屯田术",
+    "cost": { "techPoints": 120 },
+    "prereqIds": [],
+    "unlocks": { "equipmentIds": [], "unitIds": [], "buildingIds": [] }
+  }
+]

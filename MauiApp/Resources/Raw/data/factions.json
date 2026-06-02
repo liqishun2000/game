@@ -1,0 +1,30 @@
+[
+  {
+    "id": "player",
+    "name": "玩家势力",
+    "colorHex": "#2E6FDB",
+    "kind": "player",
+    "startResources": { "gold": 500, "food": 1000, "techPoints": 0 },
+    "generalIds": ["liubei", "guanyu"],
+    "recruitableUnitIds": ["default_bing", "bai_er_bing"]
+  },
+  {
+    "id": "ai_lord",
+    "name": "敌对诸侯",
+    "colorHex": "#C0392B",
+    "kind": "ai",
+    "aiDifficulty": "normal",
+    "startResources": { "gold": 500, "food": 1000, "techPoints": 0 },
+    "generalIds": ["ai_general_jia", "ai_strategist_yi"],
+    "recruitableUnitIds": ["default_bing", "qingzhou_bing"]
+  },
+  {
+    "id": "rebel",
+    "name": "叛军",
+    "colorHex": "#7F8C8D",
+    "kind": "rebel",
+    "startResources": { "gold": 0, "food": 0, "techPoints": 0 },
+    "generalIds": [],
+    "recruitableUnitIds": []
+  }
+]

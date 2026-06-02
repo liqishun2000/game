@@ -1,0 +1,42 @@
+[
+  {
+    "id": "qinglongdao",
+    "name": "青龙偃月刀",
+    "isUnique": true,
+    "forGeneralOnly": true,
+    "requiredTechId": null,
+    "statMods": { "pAtk": 20, "spd": 5 },
+    "effects": ["wushuang"],
+    "droppable": true
+  },
+  {
+    "id": "shuanggujian",
+    "name": "双股剑",
+    "isUnique": true,
+    "forGeneralOnly": true,
+    "requiredTechId": null,
+    "statMods": { "pAtk": 12, "pDef": 8 },
+    "effects": [],
+    "droppable": true
+  },
+  {
+    "id": "tie_jia",
+    "name": "铁甲",
+    "isUnique": false,
+    "forGeneralOnly": false,
+    "requiredTechId": "forging_1",
+    "statMods": { "pDef": 10 },
+    "effects": [],
+    "droppable": false
+  },
+  {
+    "id": "gang_dao",
+    "name": "钢刀",
+    "isUnique": false,
+    "forGeneralOnly": false,
+    "requiredTechId": "forging_1",
+    "statMods": { "pAtk": 8 },
+    "effects": [],
+    "droppable": false
+  }
+]

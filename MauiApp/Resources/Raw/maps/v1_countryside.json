@@ -1,0 +1,76 @@
+{
+  "id": "v1_countryside",
+  "name": "乡野初阵",
+  "columnLayout": [1, 2, 3, 2, 1],
+  "nodes": [
+    {
+      "id": "n_left1", "type": "village", "name": "玄德屯", "col": 0, "row": 0,
+      "ownerFactionId": "player", "isRebelFixed": false,
+      "buildings": [{ "templateId": "farm", "level": 1 }],
+      "garrison": { "generalIds": ["liubei", "guanyu"], "units": [{ "templateId": "default_bing", "count": 5 }] }
+    },
+    {
+      "id": "n_c1_t", "type": "village", "name": "北乡", "col": 1, "row": 0,
+      "ownerFactionId": "rebel", "isRebelFixed": true,
+      "buildings": [],
+      "garrison": { "generalIds": [], "units": [{ "templateId": "default_bing", "count": 2 }] }
+    },
+    {
+      "id": "n_c1_b", "type": "village", "name": "南乡", "col": 1, "row": 1,
+      "ownerFactionId": "rebel", "isRebelFixed": true,
+      "buildings": [],
+      "garrison": { "generalIds": [], "units": [{ "templateId": "default_bing", "count": 2 }] }
+    },
+    {
+      "id": "n_mid_t", "type": "village", "name": "上邑", "col": 2, "row": 0,
+      "ownerFactionId": "rebel", "isRebelFixed": true,
+      "buildings": [],
+      "garrison": { "generalIds": [], "units": [{ "templateId": "default_bing", "count": 3 }] }
+    },
+    {
+      "id": "n_mid_m", "type": "village", "name": "中邑", "col": 2, "row": 1,
+      "ownerFactionId": "rebel", "isRebelFixed": true,
+      "buildings": [],
+      "garrison": { "generalIds": ["rebel_chief"], "units": [{ "templateId": "default_bing", "count": 4 }] }
+    },
+    {
+      "id": "n_mid_b", "type": "village", "name": "下邑", "col": 2, "row": 2,
+      "ownerFactionId": "rebel", "isRebelFixed": true,
+      "buildings": [],
+      "garrison": { "generalIds": [], "units": [{ "templateId": "default_bing", "count": 3 }] }
+    },
+    {
+      "id": "n_c3_t", "type": "village", "name": "东岗", "col": 3, "row": 0,
+      "ownerFactionId": "rebel", "isRebelFixed": true,
+      "buildings": [],
+      "garrison": { "generalIds": [], "units": [{ "templateId": "default_bing", "count": 2 }] }
+    },
+    {
+      "id": "n_c3_b", "type": "village", "name": "西岗", "col": 3, "row": 1,
+      "ownerFactionId": "rebel", "isRebelFixed": true,
+      "buildings": [],
+      "garrison": { "generalIds": [], "units": [{ "templateId": "default_bing", "count": 2 }] }
+    },
+    {
+      "id": "n_right1", "type": "village", "name": "敌寨", "col": 4, "row": 0,
+      "ownerFactionId": "ai_lord", "isRebelFixed": false,
+      "buildings": [{ "templateId": "farm", "level": 1 }],
+      "garrison": { "generalIds": ["ai_general_jia", "ai_strategist_yi"], "units": [{ "templateId": "default_bing", "count": 5 }] }
+    }
+  ],
+  "roads": [
+    ["n_left1", "n_c1_t"],
+    ["n_left1", "n_c1_b"],
+    ["n_c1_t", "n_mid_t"],
+    ["n_c1_t", "n_mid_m"],
+    ["n_c1_b", "n_mid_m"],
+    ["n_c1_b", "n_mid_b"],
+    ["n_mid_t", "n_c3_t"],
+    ["n_mid_m", "n_c3_t"],
+    ["n_mid_m", "n_c3_b"],
+    ["n_mid_b", "n_c3_b"],
+    ["n_c3_t", "n_right1"],
+    ["n_c3_b", "n_right1"]
+  ],
+  "spawns": { "player": "n_left1", "ai": "n_right1" }
+}

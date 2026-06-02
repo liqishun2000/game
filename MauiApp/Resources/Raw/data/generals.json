@@ -1,0 +1,37 @@
+[
+  {
+    "id": "liubei",
+    "name": "刘备",
+    "mapStats": { "wuli": 75, "tongshuai": 80, "zhili": 75, "zhengzhi": 80, "meili": 95, "yizhi": 92 },
+    "traits": ["rende"],
+    "defaultEquipmentId": "shuanggujian"
+  },
+  {
+    "id": "guanyu",
+    "name": "关羽",
+    "mapStats": { "wuli": 97, "tongshuai": 95, "zhili": 75, "zhengzhi": 62, "meili": 93, "yizhi": 90 },
+    "traits": ["bushoufu"],
+    "defaultEquipmentId": "qinglongdao"
+  },
+  {
+    "id": "ai_general_jia",
+    "name": "敌将甲",
+    "mapStats": { "wuli": 88, "tongshuai": 82, "zhili": 70, "zhengzhi": 60, "meili": 70, "yizhi": 75 },
+    "traits": ["fenyong"],
+    "defaultEquipmentId": null
+  },
+  {
+    "id": "ai_strategist_yi",
+    "name": "敌谋士乙",
+    "mapStats": { "wuli": 40, "tongshuai": 65, "zhili": 92, "zhengzhi": 80, "meili": 72, "yizhi": 80 },
+    "traits": [],
+    "defaultEquipmentId": null
+  },
+  {
+    "id": "rebel_chief",
+    "name": "贼首",
+    "mapStats": { "wuli": 60, "tongshuai": 50, "zhili": 30, "zhengzhi": 20, "meili": 30, "yizhi": 40 },
+    "traits": [],
+    "defaultEquipmentId": null
+  }
+]

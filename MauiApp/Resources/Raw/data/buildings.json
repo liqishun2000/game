@@ -1,0 +1,42 @@
+[
+  {
+    "id": "farm",
+    "name": "农田",
+    "cost": { "gold": 100 },
+    "buildTurns": 1,
+    "functions": [{ "type": "produce", "resource": "food", "amountPerTurn": 80 }],
+    "maxPerTile": 3
+  },
+  {
+    "id": "market",
+    "name": "集市",
+    "cost": { "gold": 120 },
+    "buildTurns": 1,
+    "functions": [{ "type": "produce", "resource": "gold", "amountPerTurn": 60 }],
+    "maxPerTile": 2
+  },
+  {
+    "id": "barracks",
+    "name": "兵营",
+    "cost": { "gold": 150 },
+    "buildTurns": 2,
+    "functions": [{ "type": "recruit" }],
+    "maxPerTile": 1
+  },
+  {
+    "id": "workshop",
+    "name": "工坊",
+    "cost": { "gold": 150 },
+    "buildTurns": 2,
+    "functions": [{ "type": "research", "resource": "techPoints", "amountPerTurn": 20 }],
+    "maxPerTile": 1
+  },
+  {
+    "id": "wall",
+    "name": "寨墙",
+    "cost": { "gold": 100 },
+    "buildTurns": 1,
+    "functions": [{ "type": "defense" }],
+    "maxPerTile": 1
+  }
+]

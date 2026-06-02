@@ -1,0 +1,41 @@
+[
+  {
+    "id": "default_bing",
+    "name": "乡勇",
+    "isSpecial": false,
+    "maxCount": null,
+    "battleStatsBase": { "hp": 110, "pAtk": 40, "mAtk": 8, "pDef": 35, "mDef": 18, "spd": 20 },
+    "move": 4,
+    "foodUpkeep": 2,
+    "recruitCost": { "gold": 50, "food": 30 },
+    "skills": [],
+    "traits": [],
+    "equipSlots": ["weapon", "armor"]
+  },
+  {
+    "id": "qingzhou_bing",
+    "name": "青州兵",
+    "isSpecial": true,
+    "maxCount": 30,
+    "battleStatsBase": { "hp": 140, "pAtk": 52, "mAtk": 10, "pDef": 44, "mDef": 22, "spd": 24 },
+    "move": 4,
+    "foodUpkeep": 3,
+    "recruitCost": { "gold": 80, "food": 50 },
+    "skills": ["chongfeng"],
+    "traits": [],
+    "equipSlots": ["weapon", "armor"]
+  },
+  {
+    "id": "bai_er_bing",
+    "name": "白毦兵",
+    "isSpecial": true,
+    "maxCount": 20,
+    "battleStatsBase": { "hp": 150, "pAtk": 46, "mAtk": 10, "pDef": 52, "mDef": 26, "spd": 20 },
+    "move": 3,
+    "foodUpkeep": 3,
+    "recruitCost": { "gold": 90, "food": 55 },
+    "skills": [],
+    "traits": ["jianren"],
+    "equipSlots": ["weapon", "armor"]
+  }
+]
