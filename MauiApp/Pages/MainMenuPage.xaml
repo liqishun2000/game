@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MauiApp.Pages.MainMenuPage"
+             Title="三国战棋">
+
+    <Grid RowDefinitions="*,Auto,*" Padding="40">
+        <VerticalStackLayout Grid.Row="1" Spacing="16" HorizontalOptions="Center" WidthRequest="320">
+            <Label Text="三国战棋"
+                   FontSize="40"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center" />
+            <Label Text="回合制策略战棋 (开发中)"
+                   FontSize="16"
+                   Opacity="0.7"
+                   HorizontalOptions="Center" />
+
+            <Button x:Name="StartButton"
+                    Text="开始游戏"
+                    Clicked="OnStartClicked"
+                    HorizontalOptions="Fill" />
+            <Button x:Name="SelectMapButton"
+                    Text="选择地图"
+                    Clicked="OnSelectMapClicked"
+                    HorizontalOptions="Fill" />
+            <Button x:Name="LoadButton"
+                    Text="读取存档"
+                    IsEnabled="False"
+                    HorizontalOptions="Fill" />
+
+            <Label x:Name="StatusLabel"
+                   Text=""
+                   FontSize="13"
+                   Opacity="0.8"
+                   HorizontalOptions="Center" />
+        </VerticalStackLayout>
+    </Grid>
+
+</ContentPage>

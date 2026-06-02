@@ -2,15 +2,44 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MauiApp", "MauiApp\MauiApp.csproj", "{F912226D-8C69-4A1F-8481-4B1F0B4AA371}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MauiApp.Game", "MauiApp.Game\MauiApp.Game.csproj", "{A05C9AEA-92B8-4F5B-B7A0-D55C803B0B0B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
 		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{F912226D-8C69-4A1F-8481-4B1F0B4AA371}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{F912226D-8C69-4A1F-8481-4B1F0B4AA371}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F912226D-8C69-4A1F-8481-4B1F0B4AA371}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F912226D-8C69-4A1F-8481-4B1F0B4AA371}.Debug|x64.Build.0 = Debug|Any CPU
+		{F912226D-8C69-4A1F-8481-4B1F0B4AA371}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F912226D-8C69-4A1F-8481-4B1F0B4AA371}.Debug|x86.Build.0 = Debug|Any CPU
 		{F912226D-8C69-4A1F-8481-4B1F0B4AA371}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F912226D-8C69-4A1F-8481-4B1F0B4AA371}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F912226D-8C69-4A1F-8481-4B1F0B4AA371}.Release|x64.ActiveCfg = Release|Any CPU
+		{F912226D-8C69-4A1F-8481-4B1F0B4AA371}.Release|x64.Build.0 = Release|Any CPU
+		{F912226D-8C69-4A1F-8481-4B1F0B4AA371}.Release|x86.ActiveCfg = Release|Any CPU
+		{F912226D-8C69-4A1F-8481-4B1F0B4AA371}.Release|x86.Build.0 = Release|Any CPU
+		{A05C9AEA-92B8-4F5B-B7A0-D55C803B0B0B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A05C9AEA-92B8-4F5B-B7A0-D55C803B0B0B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A05C9AEA-92B8-4F5B-B7A0-D55C803B0B0B}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A05C9AEA-92B8-4F5B-B7A0-D55C803B0B0B}.Debug|x64.Build.0 = Debug|Any CPU
+		{A05C9AEA-92B8-4F5B-B7A0-D55C803B0B0B}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A05C9AEA-92B8-4F5B-B7A0-D55C803B0B0B}.Debug|x86.Build.0 = Debug|Any CPU
+		{A05C9AEA-92B8-4F5B-B7A0-D55C803B0B0B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A05C9AEA-92B8-4F5B-B7A0-D55C803B0B0B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A05C9AEA-92B8-4F5B-B7A0-D55C803B0B0B}.Release|x64.ActiveCfg = Release|Any CPU
+		{A05C9AEA-92B8-4F5B-B7A0-D55C803B0B0B}.Release|x64.Build.0 = Release|Any CPU
+		{A05C9AEA-92B8-4F5B-B7A0-D55C803B0B0B}.Release|x86.ActiveCfg = Release|Any CPU
+		{A05C9AEA-92B8-4F5B-B7A0-D55C803B0B0B}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 EndGlobal
