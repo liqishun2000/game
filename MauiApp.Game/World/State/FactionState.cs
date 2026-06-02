@@ -17,5 +17,8 @@ public sealed class FactionState
     /// <summary>被俘获的敌方武将（监狱）。</summary>
     public List<GeneralInstance> Prison { get; } = new();
 
+    /// <summary>仓库：缴获/掉落的装备 id（可再分配给武将）。</summary>
+    public List<string> Armory { get; } = new();
+
     public FactionKind Kind => Def.Kind;
 }

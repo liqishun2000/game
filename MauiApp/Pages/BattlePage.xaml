@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:skia="clr-namespace:SkiaSharp.Views.Maui.Controls;assembly=SkiaSharp.Views.Maui.Controls"
+             x:Class="MauiApp.Pages.BattlePage"
+             Title="战斗"
+             BackgroundColor="#161a12">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <Border Grid.Row="0" Padding="12,8" BackgroundColor="#222a1c">
+            <Label x:Name="StatusLabel" TextColor="White" FontSize="15" />
+        </Border>
+
+        <skia:SKCanvasView Grid.Row="1"
+                           x:Name="BattleCanvas"
+                           EnableTouchEvents="True"
+                           PaintSurface="OnPaintSurface"
+                           Touch="OnCanvasTouch" />
+
+        <Border Grid.Row="2" Padding="10" BackgroundColor="#222a1c">
+            <HorizontalStackLayout Spacing="8" HorizontalOptions="Center">
+                <Button x:Name="WaitButton" Text="待机" Clicked="OnWaitClicked" />
+                <Button x:Name="FastTurnButton" Text="快进到我方" Clicked="OnFastToPlayerClicked" />
+                <Button x:Name="FastRoundButton" Text="快速回合" Clicked="OnFastRoundClicked" />
+                <Button x:Name="AutoButton" Text="自动到底" Clicked="OnAutoClicked" BackgroundColor="#a0552a" />
+            </HorizontalStackLayout>
+        </Border>
+    </Grid>
+
+</ContentPage>

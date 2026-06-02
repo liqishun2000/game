@@ -25,7 +25,7 @@
                     HorizontalOptions="Fill" />
             <Button x:Name="LoadButton"
                     Text="读取存档"
-                    IsEnabled="False"
+                    Clicked="OnLoadClicked"
                     HorizontalOptions="Fill" />
 
             <Label x:Name="StatusLabel"
