@@ -87,12 +87,12 @@ public partial class WorldMapPage : ContentPage
         if (_selectedTileId is null) return;
         var buildings = _session.State.Content.Buildings.Values.ToList();
         var names = buildings.Select(b => $"{b.Name}（金{b.Cost.Gold}/{b.BuildTurns}月）").ToArray();
-        string choice = await DisplayActionSheet("建造建筑", "取消", null, names);
+        string choice = await DisplayActionSheetAsync("建造建筑", "取消", null, names);
         int idx = Array.IndexOf(names, choice);
         if (idx < 0) return;
 
         var r = _session.World.Build(_session.PlayerFactionId, _selectedTileId, buildings[idx].Id);
-        await DisplayAlert("建造", r.Message, "确定");
+        await DisplayAlertAsync("建造", r.Message, "确定");
         RefreshHud();
         UpdateSelectionUi();
         MapCanvas.InvalidateSurface();
@@ -104,7 +104,7 @@ public partial class WorldMapPage : ContentPage
         var units = _session.PlayerFaction.Def.RecruitableUnitIds
             .Select(id => _session.State.Content.Units[id]).ToList();
         var names = units.Select(u => $"{u.Name}（金{u.RecruitCost.Gold} 粮{u.RecruitCost.Food}）").ToArray();
-        string choice = await DisplayActionSheet("招募兵种", "取消", null, names);
+        string choice = await DisplayActionSheetAsync("招募兵种", "取消", null, names);
         int idx = Array.IndexOf(names, choice);
         if (idx < 0) return;
 
@@ -112,10 +112,34 @@ public partial class WorldMapPage : ContentPage
         if (!int.TryParse(countStr, out int count) || count <= 0) return;
 
         var r = _session.World.Recruit(_session.PlayerFactionId, _selectedTileId, units[idx].Id, count);
-        await DisplayAlert("招募", r.Message, "确定");
+        await DisplayAlertAsync("招募", r.Message, "确定");
         RefreshHud();
         UpdateSelectionUi();
         MapCanvas.InvalidateSurface();
+    }
+
+    private async void OnTechClicked(object? sender, EventArgs e)
+    {
+        var faction = _session.PlayerFaction;
+        var available = _session.State.Content.Techs.Values
+            .Where(t => !faction.ResearchedTechIds.Contains(t.Id)
+                        && t.PrereqIds.All(p => faction.ResearchedTechIds.Contains(p)))
+            .ToList();
+
+        if (available.Count == 0)
+        {
+            await DisplayAlertAsync("科技", "暂无可研究的科技。", "确定");
+            return;
+        }
+
+        var names = available.Select(t => $"{t.Name}（科技{t.Cost.TechPoints} 金{t.Cost.Gold}）").ToArray();
+        string choice = await DisplayActionSheetAsync("研究科技", "取消", null, names);
+        int idx = Array.IndexOf(names, choice);
+        if (idx < 0) return;
+
+        var r = _session.World.Research(_session.PlayerFactionId, available[idx].Id);
+        await DisplayAlertAsync("科技", r.Message, "确定");
+        RefreshHud();
     }
 
     private async void OnAttackClicked(object? sender, EventArgs e)
@@ -123,7 +147,7 @@ public partial class WorldMapPage : ContentPage
         if (_selectedTileId is null || _attackTargets.Count == 0) return;
         var targets = _attackTargets.Select(id => _session.State.Tiles[id]).ToList();
         var names = targets.Select(t => $"{t.Name}（{OwnerName(t)} 兵{t.Units.Count}）").ToArray();
-        string choice = await DisplayActionSheet("出征目标", "取消", null, names);
+        string choice = await DisplayActionSheetAsync("出征目标", "取消", null, names);
         int idx = Array.IndexOf(names, choice);
         if (idx < 0) return;
 
@@ -136,11 +160,11 @@ public partial class WorldMapPage : ContentPage
         try
         {
             await SaveStore.SaveAsync(_session);
-            await DisplayAlert("保存", $"已保存（第 {_session.State.Month} 月）。", "确定");
+            await DisplayAlertAsync("保存", $"已保存（第 {_session.State.Month} 月）。", "确定");
         }
         catch (Exception ex)
         {
-            await DisplayAlert("保存失败", ex.Message, "确定");
+            await DisplayAlertAsync("保存失败", ex.Message, "确定");
         }
     }
 
@@ -153,7 +177,7 @@ public partial class WorldMapPage : ContentPage
         MapCanvas.InvalidateSurface();
 
         if (report.CompletedBuildings.Count > 0)
-            await DisplayAlert("本月完工", string.Join("\n", report.CompletedBuildings), "确定");
+            await DisplayAlertAsync("本月完工", string.Join("\n", report.CompletedBuildings), "确定");
 
         CheckGameOver();
     }
@@ -167,12 +191,12 @@ public partial class WorldMapPage : ContentPage
 
         if (!playerAlive)
         {
-            await DisplayAlert("战败", "你已失去所有地盘。", "返回主菜单");
+            await DisplayAlertAsync("战败", "你已失去所有地盘。", "返回主菜单");
             await Navigation.PopToRootAsync();
         }
         else if (!enemiesAlive)
         {
-            await DisplayAlert("胜利", "敌对诸侯已被消灭，天下归一！", "返回主菜单");
+            await DisplayAlertAsync("胜利", "敌对诸侯已被消灭，天下归一！", "返回主菜单");
             await Navigation.PopToRootAsync();
         }
     }

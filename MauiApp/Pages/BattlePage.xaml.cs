@@ -167,7 +167,7 @@ public partial class BattlePage : ContentPage
         if (result.Drops.Count > 0)
             parts.Add("缴获: " + string.Join("、", result.Drops.Select(d => Name(d.EquipmentId, equip: true))));
 
-        await DisplayAlert("战斗结束", string.Join("\n", parts), "返回大地图");
+        await DisplayAlertAsync("战斗结束", string.Join("\n", parts), "返回大地图");
         await Navigation.PopAsync();
     }
 

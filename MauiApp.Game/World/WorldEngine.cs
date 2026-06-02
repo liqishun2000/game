@@ -108,6 +108,28 @@ public sealed class WorldEngine
         return OperationResult.Ok($"招募 {template.Name} ×{count}");
     }
 
+    /// <summary>研究科技（消耗科技点/金钱，需满足前置）。</summary>
+    public OperationResult Research(string factionId, string techId)
+    {
+        if (!_state.Content.Techs.TryGetValue(techId, out var tech))
+            return OperationResult.Fail($"科技不存在: {techId}");
+
+        var faction = _state.Factions[factionId];
+        if (faction.ResearchedTechIds.Contains(techId))
+            return OperationResult.Fail("该科技已研究");
+
+        var missing = tech.PrereqIds.Where(p => !faction.ResearchedTechIds.Contains(p)).ToList();
+        if (missing.Count > 0)
+            return OperationResult.Fail($"前置科技未完成: {string.Join("、", missing)}");
+
+        if (!CanAfford(faction, tech.Cost))
+            return OperationResult.Fail("资源不足");
+
+        Pay(faction, tech.Cost);
+        faction.ResearchedTechIds.Add(techId);
+        return OperationResult.Ok($"已研究 {tech.Name}");
+    }
+
     /// <summary>推进一个月：产出 -> 粮食消耗/逃兵 -> 建造进度 -> 监狱计时。</summary>
     public MonthlyReport AdvanceMonth()
     {

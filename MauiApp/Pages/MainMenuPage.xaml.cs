@@ -1,4 +1,5 @@
 using MauiApp.Game.App;
+using MauiApp.Game.Content;
 using MauiApp.Game.Model;
 using MauiApp.Services;
 
@@ -6,11 +7,28 @@ namespace MauiApp.Pages;
 
 public partial class MainMenuPage : ContentPage
 {
-    private const string MapId = "v1_countryside";
+    private const string DefaultMapId = "v1_countryside";
+
+    private ContentLoadResult? _content;
+    private string _mapId = DefaultMapId;
 
     public MainMenuPage()
     {
         InitializeComponent();
+    }
+
+    private async Task<ContentLoadResult?> EnsureContentAsync()
+    {
+        if (_content is not null) return _content;
+        var loaded = await ContentProvider.LoadAsync();
+        if (!loaded.Success)
+        {
+            StatusLabel.Text = "内容校验失败：\n" + loaded.Validation;
+            return null;
+        }
+
+        _content = loaded;
+        return loaded;
     }
 
     private async void OnStartClicked(object? sender, EventArgs e)
@@ -20,15 +38,14 @@ public partial class MainMenuPage : ContentPage
 
         try
         {
-            var content = await ContentProvider.LoadAsync();
-            if (!content.Success)
-            {
-                StatusLabel.Text = "内容校验失败：\n" + content.Validation;
-                return;
-            }
+            var content = await EnsureContentAsync();
+            if (content is null) return;
+
+            if (!content.Database.Maps.ContainsKey(_mapId))
+                _mapId = content.Database.Maps.Keys.First();
 
             int seed = Environment.TickCount;
-            var session = GameSession.Start(content.Database, MapId, seed, AiDifficulty.Normal);
+            var session = GameSession.Start(content.Database, _mapId, seed, AiDifficulty.Normal);
             StatusLabel.Text = "";
             await Navigation.PushAsync(new WorldMapPage(session));
         }
@@ -68,8 +85,18 @@ public partial class MainMenuPage : ContentPage
         }
     }
 
-    private void OnSelectMapClicked(object? sender, EventArgs e)
+    private async void OnSelectMapClicked(object? sender, EventArgs e)
     {
-        StatusLabel.Text = "v1 暂仅内置「乡野」地图，自定义地图见后续里程碑。";
+        var content = await EnsureContentAsync();
+        if (content is null) return;
+
+        var maps = content.Database.Maps.Values.ToList();
+        var names = maps.Select(m => string.IsNullOrEmpty(m.Name) ? m.Id : $"{m.Name}（{m.Id}）").ToArray();
+        string choice = await DisplayActionSheetAsync("选择地图", "取消", null, names);
+        int idx = Array.IndexOf(names, choice);
+        if (idx < 0) return;
+
+        _mapId = maps[idx].Id;
+        StatusLabel.Text = $"已选择地图：{names[idx]}\n（自定义地图可放入 {ContentProvider.UserMapsDirectory}）";
     }
 }

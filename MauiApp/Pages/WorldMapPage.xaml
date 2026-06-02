@@ -24,6 +24,7 @@
                 <HorizontalStackLayout Spacing="8">
                     <Button x:Name="BuildButton" Text="建造" Clicked="OnBuildClicked" IsEnabled="False" />
                     <Button x:Name="RecruitButton" Text="招兵" Clicked="OnRecruitClicked" IsEnabled="False" />
+                    <Button x:Name="TechButton" Text="科技" Clicked="OnTechClicked" />
                     <Button x:Name="AttackButton" Text="出征" Clicked="OnAttackClicked" IsEnabled="False" />
                     <Button x:Name="SaveButton" Text="保存" Clicked="OnSaveClicked" />
                     <Button x:Name="EndTurnButton" Text="结束本月" Clicked="OnEndTurnClicked" BackgroundColor="#3a8a4a" />

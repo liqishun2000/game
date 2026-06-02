@@ -52,7 +52,8 @@ public sealed class BattleRenderer
         using var ring = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 4 };
         using var hpBg = new SKPaint { Color = new SKColor(0x40, 0x40, 0x40), Style = SKPaintStyle.Fill };
         using var hp = new SKPaint { Style = SKPaintStyle.Fill };
-        using var text = new SKPaint { IsAntialias = true, Color = SKColors.White, TextSize = 13, TextAlign = SKTextAlign.Center };
+        using var text = new SKPaint { IsAntialias = true, Color = SKColors.White };
+        using var font = new SKFont { Size = 13 };
 
         foreach (var u in state.Units.Where(u => u.IsAlive))
         {
@@ -86,7 +87,7 @@ public sealed class BattleRenderer
             hp.Color = ratio > 0.5f ? new SKColor(0x4c, 0xd0, 0x5a) : ratio > 0.2f ? new SKColor(0xe0, 0xc0, 0x40) : new SKColor(0xe0, 0x50, 0x40);
             canvas.DrawRect(bx, by, bw * ratio, 5, hp);
 
-            canvas.DrawText(u.IsGeneral ? u.Name : "兵", center.X, center.Y + 4, text);
+            canvas.DrawText(u.IsGeneral ? u.Name : "兵", center.X, center.Y + 4, SKTextAlign.Center, font, text);
         }
     }
 

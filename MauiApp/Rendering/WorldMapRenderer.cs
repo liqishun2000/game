@@ -43,8 +43,10 @@ public sealed class WorldMapRenderer
         float r = layout.NodeRadius;
         using var fill = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Fill };
         using var ring = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 4 };
-        using var text = new SKPaint { IsAntialias = true, Color = SKColors.White, TextSize = 18, TextAlign = SKTextAlign.Center };
-        using var sub = new SKPaint { IsAntialias = true, Color = new SKColor(0xe0, 0xe0, 0xe0), TextSize = 14, TextAlign = SKTextAlign.Center };
+        using var text = new SKPaint { IsAntialias = true, Color = SKColors.White };
+        using var sub = new SKPaint { IsAntialias = true, Color = new SKColor(0xe0, 0xe0, 0xe0) };
+        using var titleFont = new SKFont { Size = 18 };
+        using var subFont = new SKFont { Size = 14 };
 
         foreach (var tile in state.Tiles.Values)
         {
@@ -64,9 +66,8 @@ public sealed class WorldMapRenderer
                 canvas.DrawCircle(p, r + 5, ring);
             }
 
-            canvas.DrawText(tile.Name, p.X, p.Y - r - 8, text);
-            int force = tile.Generals.Count + tile.Units.Count;
-            canvas.DrawText($"将{tile.Generals.Count} 兵{tile.Units.Count}", p.X, p.Y + r + 20, sub);
+            canvas.DrawText(tile.Name, p.X, p.Y - r - 8, SKTextAlign.Center, titleFont, text);
+            canvas.DrawText($"将{tile.Generals.Count} 兵{tile.Units.Count}", p.X, p.Y + r + 20, SKTextAlign.Center, subFont, sub);
         }
     }
 }
