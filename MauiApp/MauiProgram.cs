@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using MauiApp.Services;
+using Microsoft.Extensions.Logging;
+using Plugin.Maui.Audio;
 using SkiaSharp.Views.Maui.Controls.Hosting;
 using MauiAppHost = global::Microsoft.Maui.Hosting.MauiApp;
 
@@ -12,16 +14,22 @@ public static class MauiProgram
         builder
             .UseMauiApp<App>()
             .UseSkiaSharp()
+            .AddAudio()
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+                fonts.AddFont("zpix.ttf", "Pixel");
             });
+
+        builder.Services.AddSingleton<AudioService>();
 
 #if DEBUG
         builder.Logging.AddDebug();
 #endif
 
-        return builder.Build();
+        var app = builder.Build();
+        ServiceHelper.Services = app.Services;
+        return app;
     }
 }

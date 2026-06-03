@@ -4,28 +4,62 @@
              xmlns:skia="clr-namespace:SkiaSharp.Views.Maui.Controls;assembly=SkiaSharp.Views.Maui.Controls"
              x:Class="MauiApp.Pages.BattlePage"
              Title="战斗"
-             BackgroundColor="#161a12">
+             BackgroundColor="{StaticResource PixelInk}">
 
-    <Grid RowDefinitions="Auto,*,Auto">
+    <Grid>
+        <Grid RowDefinitions="Auto,*,Auto">
 
-        <Border Grid.Row="0" Padding="12,8" BackgroundColor="#222a1c">
-            <Label x:Name="StatusLabel" TextColor="White" FontSize="15" />
-        </Border>
+            <Border Grid.Row="0" Padding="12,8" BackgroundColor="{StaticResource PixelPanel}"
+                    Stroke="{StaticResource PixelGoldDark}" StrokeThickness="0">
+                <Label x:Name="StatusLabel" Style="{StaticResource PixelLabel}" FontSize="14" />
+            </Border>
 
-        <skia:SKCanvasView Grid.Row="1"
-                           x:Name="BattleCanvas"
-                           EnableTouchEvents="True"
-                           PaintSurface="OnPaintSurface"
-                           Touch="OnCanvasTouch" />
+            <skia:SKCanvasView Grid.Row="1"
+                               x:Name="BattleCanvas"
+                               EnableTouchEvents="True"
+                               PaintSurface="OnPaintSurface"
+                               Touch="OnCanvasTouch" />
 
-        <Border Grid.Row="2" Padding="10" BackgroundColor="#222a1c">
-            <HorizontalStackLayout Spacing="8" HorizontalOptions="Center">
-                <Button x:Name="WaitButton" Text="待机" Clicked="OnWaitClicked" />
-                <Button x:Name="FastTurnButton" Text="快进到我方" Clicked="OnFastToPlayerClicked" />
-                <Button x:Name="FastRoundButton" Text="快速回合" Clicked="OnFastRoundClicked" />
-                <Button x:Name="AutoButton" Text="自动到底" Clicked="OnAutoClicked" BackgroundColor="#a0552a" />
-            </HorizontalStackLayout>
-        </Border>
+            <Border Grid.Row="2" Padding="10" BackgroundColor="{StaticResource PixelPanel}">
+                <HorizontalStackLayout Spacing="8" HorizontalOptions="Center">
+                    <Button x:Name="WaitButton" Text="待机" Style="{StaticResource PixelButton}" Clicked="OnWaitClicked" />
+                    <Button x:Name="FastTurnButton" Text="快进我方" Style="{StaticResource PixelButton}" Clicked="OnFastToPlayerClicked" />
+                    <Button x:Name="FastRoundButton" Text="快速回合" Style="{StaticResource PixelButton}" Clicked="OnFastRoundClicked" />
+                    <Button x:Name="AutoButton" Text="自动到底" Style="{StaticResource PixelButtonDanger}" Clicked="OnAutoClicked" />
+                </HorizontalStackLayout>
+            </Border>
+        </Grid>
+
+        <!-- 战斗内新手引导 -->
+        <Grid x:Name="BattleCoach" IsVisible="False" BackgroundColor="#b30d0a06">
+            <Border HorizontalOptions="Center" VerticalOptions="Center"
+                    BackgroundColor="{StaticResource PixelPanel}" Stroke="{StaticResource PixelGold}"
+                    StrokeThickness="3" Padding="22,18" WidthRequest="340">
+                <VerticalStackLayout Spacing="12">
+                    <Label Text="战斗操作" Style="{StaticResource PixelLabel}" TextColor="{StaticResource PixelGold}" FontSize="18" />
+                    <Label Style="{StaticResource PixelLabel}" FontSize="15"
+                           Text="• 轮到我方单位（金圈）时，点蓝色高亮格移动。&#10;• 点红圈敌人即可就近移动并发起攻击。&#10;• 上方为行动序；可用底部按钮快进。&#10;击败敌方全部单位即获胜！" />
+                    <Button Text="明白了" Style="{StaticResource PixelButtonPrimary}" Clicked="OnBattleCoachClose" HorizontalOptions="End" />
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+
+        <!-- 结算演出层 -->
+        <Grid x:Name="ResultOverlay" IsVisible="False" BackgroundColor="#cc0d0a06">
+            <Border HorizontalOptions="Center" VerticalOptions="Center"
+                    BackgroundColor="{StaticResource PixelPanel}"
+                    Stroke="{StaticResource PixelGold}" StrokeThickness="3"
+                    Padding="28,22" WidthRequest="340">
+                <VerticalStackLayout Spacing="12" HorizontalOptions="Center">
+                    <Label x:Name="ResultTitle" Style="{StaticResource PixelTitle}" FontSize="40" Text="胜利" />
+                    <BoxView HeightRequest="2" Color="{StaticResource PixelGoldDark}" />
+                    <Label x:Name="ResultBody" Style="{StaticResource PixelLabel}" FontSize="15"
+                           HorizontalTextAlignment="Center" Text="" />
+                    <Button x:Name="ResultButton" Text="返回大地图" Style="{StaticResource PixelButtonPrimary}"
+                            Clicked="OnResultConfirm" Margin="0,8,0,0" HorizontalOptions="Fill" />
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
     </Grid>
 
 </ContentPage>

@@ -41,4 +41,23 @@
     <SolidColorBrush x:Key="Gray600Brush" Color="{StaticResource Gray600}"/>
     <SolidColorBrush x:Key="Gray900Brush" Color="{StaticResource Gray900}"/>
     <SolidColorBrush x:Key="Gray950Brush" Color="{StaticResource Gray950}"/>
+
+    <!-- ===== 像素风三国主题色板（M11） ===== -->
+    <Color x:Key="PixelInk">#16110d</Color>          <!-- 墨底 -->
+    <Color x:Key="PixelPanel">#241b14</Color>        <!-- 面板（深褐羊皮纸） -->
+    <Color x:Key="PixelPanelLight">#322619</Color>   <!-- 面板高亮 -->
+    <Color x:Key="PixelEdge">#0c0906</Color>         <!-- 描边阴影 -->
+    <Color x:Key="PixelGold">#e8b948</Color>         <!-- 金 -->
+    <Color x:Key="PixelGoldDark">#9c6b1f</Color>     <!-- 暗金 -->
+    <Color x:Key="PixelParchment">#e8d9b0</Color>
+    <Color x:Key="PixelParchmentText">#efe2bd</Color>
+    <Color x:Key="PixelJade">#3a8a4a</Color>         <!-- 蜀/我方 -->
+    <Color x:Key="PixelJadeDark">#256032</Color>
+    <Color x:Key="PixelCrimson">#b23a36</Color>      <!-- 敌/警示 -->
+    <Color x:Key="PixelCrimsonDark">#7e2522</Color>
+    <Color x:Key="PixelSteel">#5b6b7a</Color>
+
+    <SolidColorBrush x:Key="PixelInkBrush" Color="{StaticResource PixelInk}"/>
+    <SolidColorBrush x:Key="PixelPanelBrush" Color="{StaticResource PixelPanel}"/>
+    <SolidColorBrush x:Key="PixelGoldBrush" Color="{StaticResource PixelGold}"/>
 </ResourceDictionary>

@@ -1,7 +1,9 @@
 using MauiApp.Game.App;
 using MauiApp.Game.Content;
 using MauiApp.Game.Model;
+using MauiApp.Rendering;
 using MauiApp.Services;
+using SkiaSharp.Views.Maui;
 
 namespace MauiApp.Pages;
 
@@ -12,9 +14,46 @@ public partial class MainMenuPage : ContentPage
     private ContentLoadResult? _content;
     private string _mapId = DefaultMapId;
 
+    private readonly MenuBackgroundRenderer _bg = new();
+    private readonly AudioService _audio;
+    private AnimationClock? _clock;
+
     public MainMenuPage()
     {
         InitializeComponent();
+        _audio = ServiceHelper.Get<AudioService>();
+    }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+
+        MuteSwitch.IsToggled = SettingsStore.Muted;
+        VolumeSlider.Value = SettingsStore.BgmVolume;
+
+        _clock ??= new AnimationClock(Dispatcher, () => BgCanvas.InvalidateSurface()) { AlwaysAnimate = true };
+        _clock.Wake();
+
+        await _audio.PreloadAsync(new[] { AudioKeys.BgmMenu, AudioKeys.SfxClick, AudioKeys.SfxConfirm });
+        await _audio.PlayBgmAsync(AudioKeys.BgmMenu);
+    }
+
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+        _clock?.Stop();
+    }
+
+    private void OnPaintBackground(object? sender, SKPaintSurfaceEventArgs e) =>
+        _bg.Draw(e.Surface.Canvas, e.Info, _clock?.TimeSeconds ?? 0f);
+
+    private void OnMuteToggled(object? sender, ToggledEventArgs e) => _audio.SetMuted(e.Value);
+
+    private void OnVolumeChanged(object? sender, ValueChangedEventArgs e)
+    {
+        SettingsStore.BgmVolume = e.NewValue;
+        SettingsStore.SfxVolume = Math.Clamp(e.NewValue + 0.2, 0, 1);
+        _audio.ApplyBgmVolume();
     }
 
     private async Task<ContentLoadResult?> EnsureContentAsync()
@@ -33,6 +72,7 @@ public partial class MainMenuPage : ContentPage
 
     private async void OnStartClicked(object? sender, EventArgs e)
     {
+        _audio.PlaySfx(AudioKeys.SfxConfirm);
         StartButton.IsEnabled = false;
         StatusLabel.Text = "正在加载游戏内容…";
 
@@ -61,6 +101,7 @@ public partial class MainMenuPage : ContentPage
 
     private async void OnLoadClicked(object? sender, EventArgs e)
     {
+        _audio.PlaySfx(AudioKeys.SfxClick);
         if (!SaveStore.Exists)
         {
             StatusLabel.Text = "没有找到存档。";
@@ -87,6 +128,7 @@ public partial class MainMenuPage : ContentPage
 
     private async void OnSelectMapClicked(object? sender, EventArgs e)
     {
+        _audio.PlaySfx(AudioKeys.SfxClick);
         var content = await EnsureContentAsync();
         if (content is null) return;
 

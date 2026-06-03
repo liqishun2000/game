@@ -4,13 +4,12 @@
              xmlns:skia="clr-namespace:SkiaSharp.Views.Maui.Controls;assembly=SkiaSharp.Views.Maui.Controls"
              x:Class="MauiApp.Pages.WorldMapPage"
              Title="大地图"
-             BackgroundColor="#1c2028">
+             BackgroundColor="{StaticResource PixelInk}">
 
-    <Grid RowDefinitions="Auto,*,Auto">
+    <Grid>
+    <Grid RowDefinitions="44,*,Auto">
 
-        <Border Grid.Row="0" Padding="12,8" BackgroundColor="#252b35">
-            <Label x:Name="HudLabel" TextColor="White" FontSize="15" />
-        </Border>
+        <skia:SKCanvasView Grid.Row="0" x:Name="HudCanvas" PaintSurface="OnPaintHud" />
 
         <skia:SKCanvasView Grid.Row="1"
                            x:Name="MapCanvas"
@@ -18,19 +17,47 @@
                            PaintSurface="OnPaintSurface"
                            Touch="OnCanvasTouch" />
 
-        <Border Grid.Row="2" Padding="12" BackgroundColor="#252b35">
-            <VerticalStackLayout Spacing="8">
-                <Label x:Name="TileLabel" TextColor="White" FontSize="14" Text="点击地图选择地盘" />
-                <HorizontalStackLayout Spacing="8">
-                    <Button x:Name="BuildButton" Text="建造" Clicked="OnBuildClicked" IsEnabled="False" />
-                    <Button x:Name="RecruitButton" Text="招兵" Clicked="OnRecruitClicked" IsEnabled="False" />
-                    <Button x:Name="TechButton" Text="科技" Clicked="OnTechClicked" />
-                    <Button x:Name="AttackButton" Text="出征" Clicked="OnAttackClicked" IsEnabled="False" />
-                    <Button x:Name="SaveButton" Text="保存" Clicked="OnSaveClicked" />
-                    <Button x:Name="EndTurnButton" Text="结束本月" Clicked="OnEndTurnClicked" BackgroundColor="#3a8a4a" />
-                </HorizontalStackLayout>
+        <!-- 关卡目标面板（常驻） -->
+        <Border Grid.Row="1" HorizontalOptions="Start" VerticalOptions="Start" Margin="10"
+                BackgroundColor="#cc241b14" Stroke="{StaticResource PixelGoldDark}" StrokeThickness="2"
+                Padding="12,8">
+            <VerticalStackLayout x:Name="ObjectiveList" Spacing="4">
+                <Label Text="关卡目标" Style="{StaticResource PixelLabel}" TextColor="{StaticResource PixelGold}" FontSize="14" />
             </VerticalStackLayout>
         </Border>
+
+        <Border Grid.Row="2" Padding="12" BackgroundColor="{StaticResource PixelPanel}"
+                Stroke="{StaticResource PixelGoldDark}" StrokeThickness="0">
+            <VerticalStackLayout Spacing="10">
+                <Label x:Name="TileLabel" Style="{StaticResource PixelLabel}" FontSize="13" Text="点击地图选择地盘" />
+                <FlexLayout Wrap="Wrap" JustifyContent="Start" AlignItems="Center">
+                    <Button x:Name="BuildButton" Text="建造" Style="{StaticResource PixelButton}" Clicked="OnBuildClicked" IsEnabled="False" Margin="0,0,8,8" />
+                    <Button x:Name="RecruitButton" Text="招兵" Style="{StaticResource PixelButton}" Clicked="OnRecruitClicked" IsEnabled="False" Margin="0,0,8,8" />
+                    <Button x:Name="TechButton" Text="科技" Style="{StaticResource PixelButton}" Clicked="OnTechClicked" Margin="0,0,8,8" />
+                    <Button x:Name="AttackButton" Text="出征" Style="{StaticResource PixelButtonDanger}" Clicked="OnAttackClicked" IsEnabled="False" Margin="0,0,8,8" />
+                    <Button x:Name="SaveButton" Text="保存" Style="{StaticResource PixelButton}" Clicked="OnSaveClicked" Margin="0,0,8,8" />
+                    <Button x:Name="EndTurnButton" Text="结束本月" Style="{StaticResource PixelButtonPrimary}" Clicked="OnEndTurnClicked" Margin="0,0,8,8" />
+                </FlexLayout>
+            </VerticalStackLayout>
+        </Border>
+    </Grid>
+
+        <!-- 新手引导遮罩 -->
+        <Grid x:Name="CoachOverlay" IsVisible="False" BackgroundColor="#b30d0a06">
+            <Border HorizontalOptions="Center" VerticalOptions="End" Margin="20,0,20,40"
+                    BackgroundColor="{StaticResource PixelPanel}" Stroke="{StaticResource PixelGold}"
+                    StrokeThickness="3" Padding="20,16" WidthRequest="360">
+                <VerticalStackLayout Spacing="12">
+                    <Label x:Name="CoachTitle" Text="新手引导" Style="{StaticResource PixelLabel}"
+                           TextColor="{StaticResource PixelGold}" FontSize="18" />
+                    <Label x:Name="CoachText" Text="" Style="{StaticResource PixelLabel}" FontSize="15" />
+                    <HorizontalStackLayout Spacing="10" HorizontalOptions="End">
+                        <Button x:Name="CoachSkip" Text="跳过引导" Style="{StaticResource PixelButton}" Clicked="OnCoachSkip" />
+                        <Button x:Name="CoachNext" Text="下一步" Style="{StaticResource PixelButtonPrimary}" Clicked="OnCoachNext" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
     </Grid>
 
 </ContentPage>
