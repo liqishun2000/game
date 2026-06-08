@@ -5,9 +5,10 @@ namespace MauiApp.Game.Save;
 /// <summary>存档 DTO：仅保存可变状态，模板引用在读取时由内容库重新绑定。</summary>
 public sealed class SaveData
 {
-    public int Version { get; set; } = 1;
+    public int Version { get; set; } = 2;
     public int Seed { get; set; }
     public string MapId { get; set; } = "";
+    public AiDifficulty Difficulty { get; set; } = AiDifficulty.Normal;
     public int Month { get; set; }
     public int NextUnitId { get; set; }
     public List<SaveFaction> Factions { get; set; } = new();
@@ -52,6 +53,7 @@ public sealed class SaveGeneral
     public GeneralStatus Status { get; set; }
     public string? TileId { get; set; }
     public int DetainedMonths { get; set; }
+    public bool ActedThisMonth { get; set; }
 }
 
 public sealed class SaveUnit

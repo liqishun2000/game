@@ -10,11 +10,14 @@ namespace MauiApp.Pages;
 
 public partial class BattlePage : ContentPage
 {
+    private enum PlayerPhase { Move, Action }
+
     private readonly GameSession _session;
     private readonly PendingBattle _pending;
     private readonly BattleEngine _engine;
     private readonly BattleRenderer _renderer = new();
     private readonly AudioService _audio;
+    private readonly MapCamera _camera = new();
 
     private AnimationClock _clock = default!;
     private BattleAnimator _anim = default!;
@@ -22,8 +25,16 @@ public partial class BattlePage : ContentPage
     private BattleUnit? _current;
     private HashSet<(int Col, int Row)> _reachable = new();
     private HashSet<int> _attackable = new();
+    private PlayerPhase _phase = PlayerPhase.Move;
+    private bool _selectingAttackTarget;
+    private bool _selectingSkillTarget;
     private bool _finalized;
     private bool _busy;
+    private bool _deployMode;
+    private BattleUnit? _deploySelected;
+    private float _canvasW, _canvasH;
+    private bool _cameraInit;
+    private float TopBarH => MathF.Min(54, _canvasH * 0.12f) + SafeInsets.Top;
 
     public BattlePage(GameSession session, PendingBattle pending)
     {
@@ -31,16 +42,25 @@ public partial class BattlePage : ContentPage
         _session = session;
         _pending = pending;
         _engine = pending.Engine;
+        _deployMode = pending.AwaitDeployment && !pending.Engine.State.IsStarted;
         _audio = ServiceHelper.Get<AudioService>();
+        MapCanvasGestures.Attach(BattleCanvas, OnBattlePan, OnBattleTap, OnBattlePinch);
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        OrientationService.LockLandscape();
+        ImmersiveService.Enable();
         _clock = new AnimationClock(Dispatcher, () => BattleCanvas.InvalidateSurface());
         _anim = new BattleAnimator(_clock);
 
         await PixelFont.EnsureLoadedAsync();
+        await GfxAssets.EnsureBattleCoreAsync();
+        var portraitIds = _engine.State.Units
+            .Where(u => u.GeneralTemplateId is not null)
+            .Select(u => u.GeneralTemplateId!);
+        await GfxAssets.PreloadPortraitsAsync(portraitIds);
         await _audio.PreloadAsync(new[]
         {
             AudioKeys.BgmBattle, AudioKeys.SfxMove, AudioKeys.SfxHit, AudioKeys.SfxArrow,
@@ -51,7 +71,14 @@ public partial class BattlePage : ContentPage
         if (!SettingsStore.IsTutorialDone("battle"))
             BattleCoach.IsVisible = true;
 
-        await RunUntilPlayerAsync();
+        if (_deployMode)
+        {
+            DeployMenu.IsVisible = true;
+            BattleTools.IsVisible = false;
+            UpdateDeployStatus();
+        }
+        else
+            await RunUntilPlayerAsync();
     }
 
     private void OnBattleCoachClose(object? sender, EventArgs e)
@@ -68,59 +95,318 @@ public partial class BattlePage : ContentPage
         _audio.StopBgm();
     }
 
-    private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e) =>
-        _renderer.Draw(e.Surface.Canvas, e.Info, _engine.State, _current, _reachable, _attackable,
-            _anim?.Vfx ?? new BattleVfx(), _clock?.TimeSeconds ?? 0f);
-
-    // ---------- 输入 ----------
-    private async void OnCanvasTouch(object? sender, SKTouchEventArgs e)
+    private void OnPaintSurface(object? sender, SKPaintSurfaceEventArgs e)
     {
-        if (e.ActionType == SKTouchAction.Pressed && _current is not null && !_busy)
+        _canvasW = e.Info.Width;
+        _canvasH = e.Info.Height;
+        _renderer.ComputeLayout(_engine.State, TopBarH);
+        if (!_cameraInit)
         {
-            var cell = _renderer.HitTest(_engine.State, e.Location.X, e.Location.Y);
-            if (cell is { } c) await HandleTapAsync(c.Col, c.Row);
+            float vh = MapViewportH;
+            var bounds = BattleRenderer.ComputeUnitBounds(_engine.State, _renderer.CellSize);
+            float mapW = _renderer.MapPixelWidth;
+            float mapH = _renderer.MapPixelHeight;
+            _camera.MinZoom = Math.Min(0.2f, Math.Min(_canvasW, vh) / Math.Max(mapW, mapH) * 0.6f);
+            _camera.MaxZoom = BattleRenderer.ComputeMaxZoom(_canvasW, vh, _renderer.CellSize);
+            _camera.FitToBounds(_canvasW, vh,
+                bounds.Left, bounds.Top, bounds.Width, bounds.Height,
+                mapW, mapH, margin: 1.05f);
+            // 开局至少放大到视口宽度约 18 格，避免默认过小
+            float minStart = _canvasW / (18f * _renderer.CellSize);
+            if (_camera.Zoom < minStart)
+            {
+                _camera.Zoom = Math.Min(minStart, _camera.MaxZoom);
+                _camera.FocusOnBounds(_canvasW, vh,
+                    bounds.Left, bounds.Top, bounds.Width, bounds.Height, mapW, mapH);
+            }
+            _cameraInit = true;
         }
-        e.Handled = true;
+        else
+            _camera.Clamp(_canvasW, _canvasH - TopBarH, _renderer.MapPixelWidth, _renderer.MapPixelHeight);
+        _renderer.Draw(e.Surface.Canvas, e.Info, _engine.State, _current, _reachable, _attackable,
+            _anim?.Vfx ?? new BattleVfx(), _clock?.TimeSeconds ?? 0f, _camera, SafeInsets.Top);
     }
 
+    private void OnBattlePan(float dx, float dy)
+    {
+        _camera.Pan(dx, dy);
+        _renderer.ComputeLayout(_engine.State, TopBarH);
+        _camera.Clamp(_canvasW, _canvasH - TopBarH, _renderer.MapPixelWidth, _renderer.MapPixelHeight);
+        BattleCanvas.InvalidateSurface();
+    }
+
+    private float MapViewportH => _canvasH - TopBarH;
+
+    private void ApplyBattleZoom(float factor, float anchorScreenX, float anchorScreenY)
+    {
+        if (_canvasW <= 0 || MapViewportH <= 0) return;
+        _renderer.ComputeLayout(_engine.State, TopBarH);
+        _camera.MaxZoom = BattleRenderer.ComputeMaxZoom(_canvasW, MapViewportH, _renderer.CellSize);
+        _camera.ZoomAt(anchorScreenX, anchorScreenY, factor,
+            _canvasW, MapViewportH, _renderer.MapPixelWidth, _renderer.MapPixelHeight);
+        BattleCanvas.InvalidateSurface();
+    }
+
+    private void OnZoomInClicked(object? sender, EventArgs e)
+    {
+        _audio.PlaySfx(AudioKeys.SfxClick);
+        ApplyBattleZoom(1.35f, _canvasW / 2f, MapViewportH / 2f);
+    }
+
+    private void OnZoomOutClicked(object? sender, EventArgs e)
+    {
+        _audio.PlaySfx(AudioKeys.SfxClick);
+        ApplyBattleZoom(1f / 1.35f, _canvasW / 2f, MapViewportH / 2f);
+    }
+
+    private void OnBattlePinch(float factor, float anchorX, float anchorY) =>
+        ApplyBattleZoom(factor, anchorX, anchorY - TopBarH);
+
+    private async void OnBattleTap(float x, float y)
+    {
+        if (_busy) return;
+        var cell = _renderer.HitTest(_engine.State, x, y, _camera, TopBarH);
+        if (cell is not { } c) return;
+
+        if (_deployMode)
+        {
+            HandleDeployTap(c.Col, c.Row);
+            return;
+        }
+
+        if (_current is null) return;
+        await HandleTapAsync(c.Col, c.Row);
+    }
+
+    private void HandleDeployTap(int col, int row)
+    {
+        var side = _engine.State.PlayerSide;
+        var unit = _engine.State.UnitAt(col, row);
+
+        if (unit is not null && unit.Side == side)
+        {
+            _deploySelected = unit;
+            _audio.PlaySfx(AudioKeys.SfxClick);
+            UpdateDeployStatus();
+            BattleCanvas.InvalidateSurface();
+            return;
+        }
+
+        if (_deploySelected is null) return;
+
+        if (_engine.TryDeployUnit(_deploySelected.Id, col, row))
+        {
+            _audio.PlaySfx(AudioKeys.SfxMove);
+            _deploySelected = _engine.State.GetUnit(_deploySelected.Id);
+            UpdateDeployStatus();
+            BattleCanvas.InvalidateSurface();
+        }
+    }
+
+    private void OnAutoDeployClicked(object? sender, EventArgs e)
+    {
+        _audio.PlaySfx(AudioKeys.SfxClick);
+        BattleFactory.AutoDeploySide(_engine.State, _engine.State.PlayerSide);
+        _deploySelected = null;
+        UpdateDeployStatus();
+        BattleCanvas.InvalidateSurface();
+    }
+
+    private async void OnStartBattleClicked(object? sender, EventArgs e)
+    {
+        _audio.PlaySfx(AudioKeys.SfxConfirm);
+        _deployMode = false;
+        DeployMenu.IsVisible = false;
+        BattleTools.IsVisible = true;
+        _deploySelected = null;
+        _session.BeginInteractiveBattle(_pending);
+        await RunUntilPlayerAsync();
+    }
+
+    private void UpdateDeployStatus()
+    {
+        int food = _engine.State.SideFood.GetValueOrDefault(_engine.State.PlayerSide);
+        string sel = _deploySelected is null ? "未选中" : _deploySelected.Name;
+        StatusLabel.Text = $"布阵阶段  携带粮草 {food}  ·  选中：{sel}  ·  点单位再点出生区空格移动";
+    }
+
+    // ---------- 输入（火焰纹章式：移动 → 行动菜单） ----------
     private async Task HandleTapAsync(int col, int row)
     {
         if (_current is null || _busy) return;
 
-        var target = _engine.State.UnitAt(col, row);
-
-        if (target is not null && target.Side != _current.Side && _attackable.Contains(target.Id))
+        if (_phase == PlayerPhase.Move)
         {
-            var cell = _reachable
-                .Where(p => Manhattan(p.Col, p.Row, target.Col, target.Row) == 1)
-                .OrderBy(p => Manhattan(p.Col, p.Row, _current.Col, _current.Row))
-                .First();
-            var turn = (cell.Col == _current.Col && cell.Row == _current.Row)
-                ? UnitTurn.Attack(target.Id)
-                : UnitTurn.MoveAndAttack(cell.Col, cell.Row, target.Id);
-            await PlayPlayerTurnAsync(turn);
+            if (_reachable.Contains((col, row)))
+            {
+                if (col != _current.Col || row != _current.Row)
+                    await PlayMoveAsync(col, row);
+                EnterActionPhase();
+                if (_engine.CanCurrentRetreat())
+                    StatusLabel.Text += "  可撤退回城";
+            }
             return;
         }
 
-        if (target is null && _reachable.Contains((col, row)))
-            await PlayPlayerTurnAsync(UnitTurn.MoveOnly(col, row));
+        // 行动阶段：选攻击目标
+        if (_selectingAttackTarget || _selectingSkillTarget)
+        {
+            var target = _engine.State.UnitAt(col, row);
+            if (target is not null && _attackable.Contains(target.Id))
+            {
+                double mul = _selectingSkillTarget ? 1.5 : 1.0;
+                _selectingAttackTarget = _selectingSkillTarget = false;
+                await PlayActionAsync(target.Id, mul);
+                await RunUntilPlayerAsync();
+            }
+        }
     }
 
-    private async Task PlayPlayerTurnAsync(UnitTurn turn)
+    private void EnterActionPhase()
     {
-        var actor = _current;
-        if (actor is null) return;
-        await PlayActionAsync(actor, turn);
+        _phase = PlayerPhase.Action;
+        _reachable = new HashSet<(int, int)> { (_current!.Col, _current.Row) };
+        _attackable = _engine.GetAttackable(_current);
+        ActionMenu.IsVisible = true;
+        AttackButton.IsEnabled = _attackable.Count > 0;
+        SkillButton.IsEnabled = _attackable.Count > 0;
+        RetreatButton.IsEnabled = _engine.CanCurrentRetreat();
+        UpdateStatus();
+        BattleCanvas.InvalidateSurface();
+    }
+
+    private async Task PlayMoveAsync(int col, int row)
+    {
+        _busy = true;
+        var actor = _current!;
+        var from = (actor.Col, actor.Row);
+        _engine.ExecuteMove(col, row);
+        _audio.PlaySfx(AudioKeys.SfxMove);
+        await _anim.MoveAsync(actor.Id, from, (col, row));
+        BattleCanvas.InvalidateSurface();
+        _busy = false;
+        if (_phase == PlayerPhase.Action)
+            RetreatButton.IsEnabled = _engine.CanCurrentRetreat();
+    }
+
+    private async void OnRetreatClicked(object? sender, EventArgs e)
+    {
+        if (_phase != PlayerPhase.Action || _busy || !_engine.CanCurrentRetreat()) return;
+        _audio.PlaySfx(AudioKeys.SfxConfirm);
+        _selectingAttackTarget = _selectingSkillTarget = false;
+        await PlayRetreatAsync();
         await RunUntilPlayerAsync();
     }
 
-    private async void OnWaitClicked(object? sender, EventArgs e)
+    private async Task PlayRetreatAsync()
     {
-        if (_current is not null && !_busy)
+        _busy = true;
+        var actor = _current;
+        if (actor is null) { _busy = false; return; }
+
+        var aliveBefore = _engine.State.Units.Where(u => u.IsAlive).Select(u => u.Id).ToHashSet();
+        int escBefore = _engine.Result.EscapedGenerals.Count;
+        int capBefore = _engine.Result.Captured.Count;
+        int killBefore = _engine.Result.KilledGenerals.Count;
+        _engine.ExecuteRetreat();
+        _audio.PlaySfx(AudioKeys.SfxMove);
+        StatusLabel.Text = $"{actor.Name} 撤离战场，返回出发城池";
+        ActionMenu.IsVisible = false;
+        _phase = PlayerPhase.Move;
+        BattleCanvas.InvalidateSurface();
+        await PlayDeathsAsync(aliveBefore, capBefore, killBefore, escBefore);
+        _busy = false;
+    }
+
+    private async Task PlayActionAsync(int? attackTargetId, double skillMul = 1.0)
+    {
+        _busy = true;
+        var actor = _current;
+        if (actor is null) { _busy = false; return; }
+
+        var hpBefore = _engine.State.Units.ToDictionary(u => u.Id, u => u.CurHp);
+        var aliveBefore = _engine.State.Units.Where(u => u.IsAlive).Select(u => u.Id).ToHashSet();
+        int capBefore = _engine.Result.Captured.Count;
+        int killBefore = _engine.Result.KilledGenerals.Count;
+        int escBefore = _engine.Result.EscapedGenerals.Count;
+
+        bool ranged = actor.Stats.MAtk > actor.Stats.PAtk;
+        _engine.ExecuteAction(attackTargetId, skillMul);
+
+        if (attackTargetId is { } tid)
         {
-            _audio.PlaySfx(AudioKeys.SfxMove);
-            await PlayPlayerTurnAsync(UnitTurn.Wait());
+            var target = _engine.State.GetUnit(tid);
+            if (target is not null)
+            {
+                await _anim.LungeAsync(actor.Id, target.Col - actor.Col, target.Row - actor.Row);
+                int dmg = hpBefore.GetValueOrDefault(tid) - target.CurHp;
+                if (dmg > 0)
+                {
+                    bool crit = dmg > Math.Max(1, target.MaxHp / 2);
+                    _anim.SpawnDamage(target.Col, target.Row, dmg, crit, target.Side == _engine.State.PlayerSide);
+                    _anim.Flash(tid);
+                    _anim.Shake(crit ? 7f : 4f);
+                    _audio.PlaySfx(ranged ? AudioKeys.SfxArrow : AudioKeys.SfxHit);
+                }
+
+                int counter = hpBefore.GetValueOrDefault(actor.Id) - actor.CurHp;
+                if (counter > 0 && actor.IsAlive)
+                {
+                    _anim.SpawnDamage(actor.Col, actor.Row, counter, false, actor.Side == _engine.State.PlayerSide);
+                    _anim.Flash(actor.Id);
+                }
+
+                await Task.Delay((int)(160 / Math.Max(0.1f, _anim.SpeedScale)));
+            }
         }
+
+        await PlayDeathsAsync(aliveBefore, capBefore, killBefore, escBefore);
+        ActionMenu.IsVisible = false;
+        _phase = PlayerPhase.Move;
+        BattleCanvas.InvalidateSurface();
+        _busy = false;
+    }
+
+    private void OnAttackMenuClicked(object? sender, EventArgs e)
+    {
+        if (_phase != PlayerPhase.Action || _attackable.Count == 0) return;
+        _audio.PlaySfx(AudioKeys.SfxClick);
+        _selectingAttackTarget = true;
+        _selectingSkillTarget = false;
+        StatusLabel.Text = "请选择攻击目标（点选红圈敌人）";
+    }
+
+    private void OnSkillMenuClicked(object? sender, EventArgs e)
+    {
+        if (_phase != PlayerPhase.Action || _attackable.Count == 0) return;
+        _audio.PlaySfx(AudioKeys.SfxClick);
+        _selectingSkillTarget = true;
+        _selectingAttackTarget = false;
+        StatusLabel.Text = "猛击：请选择相邻敌人（1.5×伤害）";
+    }
+
+    private async void OnDetailMenuClicked(object? sender, EventArgs e)
+    {
+        if (_current is null) return;
+        _audio.PlaySfx(AudioKeys.SfxClick);
+        var u = _current;
+        string equip = u.EquipmentId is not null && _session.State.Content.Equipment.TryGetValue(u.EquipmentId, out var eq)
+            ? eq.Name : "无";
+        await DisplayAlertAsync(u.Name,
+            $"HP {u.CurHp}/{u.MaxHp}  士气 {u.Morale}\n" +
+            $"物攻 {u.Stats.PAtk}  物防 {u.Stats.PDef}\n" +
+            $"魔攻 {u.Stats.MAtk}  魔防 {u.Stats.MDef}\n" +
+            $"速度 {u.Stats.Spd}  移动力 {u.Move}\n" +
+            $"装备 {equip}", "确定");
+    }
+
+    private async void OnActionWaitClicked(object? sender, EventArgs e)
+    {
+        if (_phase != PlayerPhase.Action || _busy) return;
+        _audio.PlaySfx(AudioKeys.SfxMove);
+        _selectingAttackTarget = _selectingSkillTarget = false;
+        await PlayActionAsync(null);
+        await RunUntilPlayerAsync();
     }
 
     private async void OnFastToPlayerClicked(object? sender, EventArgs e) => await FastAsync(() => _engine.SkipToNextPlayerDecision());
@@ -131,6 +417,8 @@ public partial class BattlePage : ContentPage
     {
         if (_busy) return;
         _busy = true;
+        ActionMenu.IsVisible = false;
+        _selectingAttackTarget = _selectingSkillTarget = false;
         bulk();
         Recompute();
         BattleCanvas.InvalidateSurface();
@@ -148,7 +436,7 @@ public partial class BattlePage : ContentPage
             var u = _engine.CurrentUnit();
             if (u is null) break;
             if (u.Side == _engine.State.PlayerSide) break;
-            await PlayActionAsync(u, _engine.BuildAutoTurn(u));
+            await PlayAiTurnAsync(u, _engine.DecideAutoTurn(u));
         }
 
         Recompute();
@@ -158,21 +446,26 @@ public partial class BattlePage : ContentPage
         await MaybeFinalizeAsync();
     }
 
-    /// <summary>把一次"瞬间结算"补放为动画：移动→冲刺→受击飘字/震屏→反击→阵亡。</summary>
-    private async Task PlayActionAsync(BattleUnit actor, UnitTurn turn)
+    private async Task PlayAiTurnAsync(BattleUnit actor, UnitTurn turn)
     {
         _busy = true;
-
         var hpBefore = _engine.State.Units.ToDictionary(u => u.Id, u => u.CurHp);
         var aliveBefore = _engine.State.Units.Where(u => u.IsAlive).Select(u => u.Id).ToHashSet();
         var from = (actor.Col, actor.Row);
         int capBefore = _engine.Result.Captured.Count;
         int killBefore = _engine.Result.KilledGenerals.Count;
         int escBefore = _engine.Result.EscapedGenerals.Count;
-
         bool ranged = actor.Stats.MAtk > actor.Stats.PAtk;
 
         _engine.ExecuteTurn(turn);
+
+        if (turn.Retreat)
+        {
+            StatusLabel.Text = $"{actor.Name} 撤离战场";
+            await PlayDeathsAsync(aliveBefore, capBefore, killBefore, escBefore);
+            _busy = false;
+            return;
+        }
 
         var to = (actor.Col, actor.Row);
         if (to != from && actor.IsAlive)
@@ -187,7 +480,6 @@ public partial class BattlePage : ContentPage
             if (target is not null)
             {
                 await _anim.LungeAsync(actor.Id, target.Col - actor.Col, target.Row - actor.Row);
-
                 int dmg = hpBefore.GetValueOrDefault(targetId) - target.CurHp;
                 if (dmg > 0)
                 {
@@ -210,7 +502,6 @@ public partial class BattlePage : ContentPage
         }
 
         await PlayDeathsAsync(aliveBefore, capBefore, killBefore, escBefore);
-
         BattleCanvas.InvalidateSurface();
         _busy = false;
     }
@@ -223,8 +514,6 @@ public partial class BattlePage : ContentPage
         if (newlyDead.Count == 0) return;
 
         _audio.PlaySfx(AudioKeys.SfxDown);
-
-        // 武将结局飘字
         SpawnGeneralLabels(_engine.Result.Captured.Skip(capBefore).Select(c => c.GeneralTemplateId), "被俘", new SKColor(0xff, 0xd1, 0x40));
         SpawnGeneralLabels(_engine.Result.KilledGenerals.Skip(killBefore), "阵亡", new SKColor(0xff, 0x6a, 0x4a));
         SpawnGeneralLabels(_engine.Result.EscapedGenerals.Skip(escBefore), "突围", new SKColor(0x8a, 0xd0, 0xff));
@@ -245,10 +534,13 @@ public partial class BattlePage : ContentPage
         }
     }
 
-    // ---------- 状态/结算 ----------
     private void Recompute()
     {
         _current = _engine.CurrentUnit();
+        _phase = PlayerPhase.Move;
+        _selectingAttackTarget = _selectingSkillTarget = false;
+        ActionMenu.IsVisible = false;
+
         if (_current is null || _current.Side != _engine.State.PlayerSide)
         {
             _reachable = new();
@@ -258,11 +550,7 @@ public partial class BattlePage : ContentPage
         }
 
         _reachable = _engine.GetReachable(_current);
-        _attackable = _engine.State.Units
-            .Where(u => u.IsAlive && u.Side != _current.Side &&
-                        _reachable.Any(p => Manhattan(p.Col, p.Row, u.Col, u.Row) == 1))
-            .Select(u => u.Id)
-            .ToHashSet();
+        _attackable = new HashSet<int>();
         UpdateStatus();
     }
 
@@ -271,7 +559,11 @@ public partial class BattlePage : ContentPage
         int atk = _engine.State.AliveOf(BattleSide.Attacker).Count();
         int def = _engine.State.AliveOf(BattleSide.Defender).Count();
         string who = _current is null ? "—" : $"{_current.Name}（{(_current.Side == _engine.State.PlayerSide ? "我方" : "敌方")}）";
-        StatusLabel.Text = $"第 {_engine.State.Round}/{_engine.State.MaxRounds} 回合   我方 {atk}  敌方 {def}   当前:{who}";
+        string phase = _phase == PlayerPhase.Move ? "移动" : "行动";
+        int food = _engine.State.SideFood.GetValueOrDefault(_engine.State.PlayerSide);
+        int starve = _engine.State.StarvationRounds.GetValueOrDefault(_engine.State.PlayerSide);
+        string foodLine = starve > 0 ? $"  断粮{starve}回合" : $"  粮草{food}";
+        StatusLabel.Text = $"第 {_engine.State.Round}/{_engine.State.MaxRounds} 回合   我方 {atk}  敌方 {def}{foodLine}   当前:{who} [{phase}]";
     }
 
     private async Task MaybeFinalizeAsync()
@@ -320,7 +612,4 @@ public partial class BattlePage : ContentPage
             return _session.State.Content.Equipment.TryGetValue(id, out var eq) ? eq.Name : id;
         return _session.State.Content.Generals.TryGetValue(id, out var g) ? g.Name : id;
     }
-
-    private static int Manhattan(int c1, int r1, int c2, int r2) =>
-        Math.Abs(c1 - c2) + Math.Abs(r1 - r2);
 }

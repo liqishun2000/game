@@ -1,3 +1,5 @@
+using MauiApp.Game.Battle;
+
 namespace MauiApp.Game.Model;
 
 /// <summary>地盘上已建成的建筑。</summary>
@@ -48,4 +50,7 @@ public sealed class MapDef
 
     /// <summary>出生点：势力 id -> 节点 id。</summary>
     public Dictionary<string, string> Spawns { get; set; } = new();
+
+    /// <summary>战场配置（地图 JSON 可覆盖）。</summary>
+    public BattleConfig? BattleConfig { get; set; }
 }

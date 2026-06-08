@@ -8,21 +8,31 @@ namespace MauiApp.Rendering;
 /// </summary>
 public sealed class FloatingText
 {
-    public required string Text { get; init; }
-    public SKColor Color { get; init; } = SKColors.White;
+    public string Text { get; set; } = "";
+    public SKColor Color { get; set; } = SKColors.White;
     public float X { get; set; }
     public float Y { get; set; }
 
     /// <summary>字号占格高比例（渲染器 = CellSize * SizeFactor）。</summary>
-    public float SizeFactor { get; init; } = 0.34f;
+    public float SizeFactor { get; set; } = 0.34f;
     public float Age { get; set; }
-    public float Life { get; init; } = 0.85f;
+    public float Life { get; set; } = 0.85f;
 
     /// <summary>上浮速度（格/秒）。</summary>
-    public float RiseSpeed { get; init; } = 1.1f;
+    public float RiseSpeed { get; set; } = 1.1f;
 
     public bool Done => Age >= Life;
     public float Alpha => Math.Clamp(1f - Age / Life, 0f, 1f);
+
+    public void Clear()
+    {
+        Text = "";
+        Color = SKColors.White;
+        X = Y = Age = 0;
+        SizeFactor = 0.34f;
+        Life = 0.85f;
+        RiseSpeed = 1.1f;
+    }
 
     /// <summary>推进；返回是否仍存活。</summary>
     public bool Advance(float dt)

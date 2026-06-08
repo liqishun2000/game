@@ -18,6 +18,9 @@ public sealed class GeneralInstance
     /// <summary>所在地盘 id（被俘时为关押方监狱，TileId 置空）。</summary>
     public string? TileId { get; set; }
 
+    /// <summary>本月是否已执行战略行动（出征等）；月末清零。</summary>
+    public bool ActedThisMonth { get; set; }
+
     /// <summary>被俘后已关押月数（用于招降概率，05 第 9 节）。</summary>
     public int DetainedMonths { get; set; }
 }

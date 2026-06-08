@@ -6,11 +6,11 @@ namespace MauiApp.Rendering;
 /// <summary>正在淡出的阵亡单位（引擎已判定死亡，UI 仍补放倒地动画）。</summary>
 public sealed class DyingUnit
 {
-    public int Id { get; init; }
-    public int Col { get; init; }
-    public int Row { get; init; }
-    public BattleSide Side { get; init; }
-    public bool IsGeneral { get; init; }
+    public int Id { get; set; }
+    public int Col { get; set; }
+    public int Row { get; set; }
+    public BattleSide Side { get; set; }
+    public bool IsGeneral { get; set; }
     public float Alpha { get; set; } = 1f;
 }
 

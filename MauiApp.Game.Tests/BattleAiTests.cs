@@ -36,7 +36,7 @@ public class BattleAiTests
     [Fact]
     public void Hard_Ai_Retreats_Low_Hp_General()
     {
-        var state = new BattleState { Width = 10, Height = 6, PlayerSide = BattleSide.Defender };
+        var state = new BattleState { Width = 10, Height = 6, PlayerSide = BattleSide.Defender, SpawnDepth = 2 };
         var general = U(1, BattleSide.Attacker, 5, 3, spd: 30, move: 4, hp: 100, curHp: 10, pAtk: 50, pDef: 10, general: true);
         var enemy = U(2, BattleSide.Defender, 4, 3, spd: 10, move: 4, hp: 200, curHp: 200, pAtk: 50, pDef: 10);
         state.Units.AddRange(new[] { general, enemy });

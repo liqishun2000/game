@@ -18,4 +18,6 @@ public sealed class MonthlyReport
     public int Month { get; set; }
     public List<FactionMonthSummary> Factions { get; } = new();
     public List<string> CompletedBuildings { get; } = new();
+    /// <summary>AI 势力本月行动摘要（供 UI 展示）。</summary>
+    public List<string> AiActions { get; } = new();
 }

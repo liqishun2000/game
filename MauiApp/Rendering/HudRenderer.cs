@@ -5,15 +5,15 @@ namespace MauiApp.Rendering;
 /// <summary>大地图顶栏像素 HUD：月份徽 + 金/粮/科技/监狱 图标与数值。</summary>
 public sealed class HudRenderer
 {
-    public void Draw(SKCanvas canvas, SKImageInfo info, int month, int gold, int food, int tech, int prison)
+    public void Draw(SKCanvas canvas, SKImageInfo info, int month, int gold, int food, int tech, int prison, float topInset = 0)
     {
         canvas.Clear(new SKColor(0x24, 0x1b, 0x14));
-        using var edge = new SKPaint { IsAntialias = false, Color = new SKColor(0x9c, 0x6b, 0x1f), Style = SKPaintStyle.Stroke, StrokeWidth = 2 };
-        canvas.DrawLine(0, info.Height - 1, info.Width, info.Height - 1, edge);
-
         float h = info.Height;
-        float icon = MathF.Min(h * 0.5f, 22);
-        float cy = h / 2;
+        float cy = topInset + (h - topInset) / 2f;
+        using var edge = new SKPaint { IsAntialias = false, Color = new SKColor(0x9c, 0x6b, 0x1f), Style = SKPaintStyle.Stroke, StrokeWidth = 2 };
+        canvas.DrawLine(0, h - 1, info.Width, h - 1, edge);
+
+        float icon = MathF.Min((h - topInset) * 0.5f, 22);
         float x = 12;
 
         using var font = new SKFont(PixelFont.Typeface, MathF.Max(13, h * 0.34f));

@@ -14,6 +14,8 @@ public partial class MainMenuPage : ContentPage
     private ContentLoadResult? _content;
     private string _mapId = DefaultMapId;
 
+    private AiDifficulty _difficulty = AiDifficulty.Normal;
+
     private readonly MenuBackgroundRenderer _bg = new();
     private readonly AudioService _audio;
     private AnimationClock? _clock;
@@ -27,6 +29,9 @@ public partial class MainMenuPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        ImmersiveService.Enable();
+        OrientationService.LockLandscape();
+        MenuLayout.Padding = new Thickness(24, 16 + SafeInsets.Top, 24, 16 + SafeInsets.Bottom);
 
         MuteSwitch.IsToggled = SettingsStore.Muted;
         VolumeSlider.Value = SettingsStore.BgmVolume;
@@ -85,7 +90,7 @@ public partial class MainMenuPage : ContentPage
                 _mapId = content.Database.Maps.Keys.First();
 
             int seed = Environment.TickCount;
-            var session = GameSession.Start(content.Database, _mapId, seed, AiDifficulty.Normal);
+            var session = GameSession.Start(content.Database, _mapId, seed, _difficulty);
             StatusLabel.Text = "";
             await Navigation.PushAsync(new WorldMapPage(session));
         }
@@ -140,5 +145,22 @@ public partial class MainMenuPage : ContentPage
 
         _mapId = maps[idx].Id;
         StatusLabel.Text = $"已选择地图：{names[idx]}\n（自定义地图可放入 {ContentProvider.UserMapsDirectory}）";
+    }
+
+    private async void OnDifficultyClicked(object? sender, EventArgs e)
+    {
+        _audio.PlaySfx(AudioKeys.SfxClick);
+        var names = new[] { "简单", "普通", "困难" };
+        string choice = await DisplayActionSheetAsync("AI 难度", "取消", null, names);
+        int idx = Array.IndexOf(names, choice);
+        if (idx < 0) return;
+        _difficulty = idx switch
+        {
+            0 => AiDifficulty.Easy,
+            2 => AiDifficulty.Hard,
+            _ => AiDifficulty.Normal,
+        };
+        StatusLabel.Text = $"难度：{names[idx]}";
+        DifficultyButton.Text = $"AI 难度：{names[idx]}";
     }
 }

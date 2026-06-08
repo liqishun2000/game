@@ -10,11 +10,14 @@
     <Grid>
         <skia:SKCanvasView x:Name="BgCanvas" PaintSurface="OnPaintBackground" />
 
-        <Grid RowDefinitions="*,Auto,*" Padding="32">
-            <VerticalStackLayout Grid.Row="1" Spacing="14" HorizontalOptions="Center" WidthRequest="320">
+        <Grid x:Name="MenuLayout" RowDefinitions="*" Padding="24,16">
+            <VerticalStackLayout Grid.Row="0" Spacing="12" HorizontalOptions="Center" VerticalOptions="Center"
+                                 MaximumWidthRequest="420">
 
                 <Label Text="三国战棋"
                        Style="{StaticResource PixelTitle}"
+                       FontSize="36"
+                       HorizontalTextAlignment="Center"
                        Shadow="{x:Null}" />
                 <Label Text="乡 野 初 阵"
                        Style="{StaticResource PixelLabel}"
@@ -39,6 +42,11 @@
                         Text="读取存档"
                         Style="{StaticResource PixelButton}"
                         Clicked="OnLoadClicked"
+                        HorizontalOptions="Fill" />
+                <Button x:Name="DifficultyButton"
+                        Text="AI 难度：普通"
+                        Style="{StaticResource PixelButton}"
+                        Clicked="OnDifficultyClicked"
                         HorizontalOptions="Fill" />
 
                 <HorizontalStackLayout Spacing="10" HorizontalOptions="Center" Margin="0,8,0,0">

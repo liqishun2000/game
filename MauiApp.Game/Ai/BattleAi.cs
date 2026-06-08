@@ -24,10 +24,10 @@ public sealed class BattleAi : IAiController
         var enemies = state.Units.Where(u => u.IsAlive && u.Side != unit.Side).ToList();
         if (enemies.Count == 0) return UnitTurn.Wait();
 
-        // hard：残血武将撤退（降低被俘风险）
-        if (_difficulty == AiDifficulty.Hard && unit.IsGeneral && unit.CurHp < unit.MaxHp * 0.25)
+        // 残血武将向己方入场边缘撤退（到达后可离场）
+        if (unit.IsGeneral && unit.CurHp < unit.MaxHp * (_difficulty == AiDifficulty.Hard ? 0.35 : 0.2))
         {
-            var retreat = TryRetreat(engine, unit, enemies);
+            var retreat = TryRetreatToExit(engine, unit);
             if (retreat is not null) return retreat;
         }
 
@@ -76,17 +76,40 @@ public sealed class BattleAi : IAiController
             : UnitTurn.MoveOnly(best.Col, best.Row);
     }
 
-    private static UnitTurn? TryRetreat(BattleEngine engine, BattleUnit unit, List<BattleUnit> enemies)
+    private static UnitTurn? TryRetreatToExit(BattleEngine engine, BattleUnit unit)
     {
-        var reachable = engine.GetReachable(unit);
-        var safest = reachable
-            .OrderByDescending(p => enemies.Min(e => Manhattan(p.Col, p.Row, e.Col, e.Row)))
-            .ThenBy(p => p.Col).ThenBy(p => p.Row)
-            .First();
+        var state = engine.State;
+        if (state.CanRetreat(unit))
+        {
+            unit.IsFleeing = true;
+            return UnitTurn.RetreatFromBattle();
+        }
 
-        if (safest.Col == unit.Col && safest.Row == unit.Row) return null;
+        var reachable = engine.GetReachable(unit);
+        var exitCells = reachable.Where(p => state.IsExitTile(unit.Side, p.Col, p.Row)).ToList();
+        if (exitCells.Count == 0)
+        {
+            int depth = state.EffectiveSpawnDepth();
+            var targetCol = unit.Side == BattleSide.Attacker ? depth - 1 : state.Width - depth;
+            var toward = reachable
+                .OrderBy(p => Math.Abs(p.Col - targetCol) + Math.Abs(p.Row - unit.Row))
+                .ThenBy(p => p.Col).ThenBy(p => p.Row)
+                .FirstOrDefault();
+            if (toward == default || (toward.Col == unit.Col && toward.Row == unit.Row))
+                return null;
+            unit.IsFleeing = true;
+            return UnitTurn.MoveOnly(toward.Col, toward.Row);
+        }
+
+        var best = exitCells
+            .OrderBy(p => unit.Side == BattleSide.Attacker ? p.Col : -p.Col)
+            .ThenBy(p => p.Row)
+            .First();
+        if (best.Col == unit.Col && best.Row == unit.Row)
+            return null;
+
         unit.IsFleeing = true;
-        return UnitTurn.MoveOnly(safest.Col, safest.Row);
+        return UnitTurn.MoveOnly(best.Col, best.Row);
     }
 
     private static int Manhattan(int c1, int r1, int c2, int r2) =>

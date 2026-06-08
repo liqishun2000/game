@@ -1,3 +1,4 @@
+using MauiApp.Game.Battle;
 using MauiApp.Game.Content;
 using MauiApp.Game.Model;
 using MauiApp.Game.World.State;
@@ -206,5 +207,27 @@ public static class StatCalculator
                         + (loyalist ? -0.5 : 0);
 
         return Math.Clamp(chance, 0.0, 0.95);
+    }
+
+    // ============ 战场粮草（05 第 7 节）============
+
+    public static int BattleFoodCostPerRound(int aliveUnitCount, BalanceConfig b) =>
+        Math.Max(1, aliveUnitCount * b.BattleFoodPerUnit);
+
+    public static void ApplyStarvationPenalties(
+        IEnumerable<BattleUnit> units, int starvationRound, int commanderYizhi, BalanceConfig b)
+    {
+        double willMod = Math.Clamp(1.0 - commanderYizhi / 300.0, 0.5, 1.0);
+        foreach (var u in units)
+        {
+            if (starvationRound == 1)
+                u.Morale = Math.Max(0, u.Morale - (int)(b.BattleStarvationMoraleLoss * willMod));
+            else if (starvationRound >= 2)
+            {
+                int hungerDmg = Math.Max(1, (int)(u.MaxHp * 0.03 * (starvationRound - 1) * willMod));
+                u.CurHp -= hungerDmg;
+                if (u.CurHp < 0) u.CurHp = 0;
+            }
+        }
     }
 }

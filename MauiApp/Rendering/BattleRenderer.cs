@@ -1,4 +1,5 @@
 using MauiApp.Game.Battle;
+using MauiApp.Services;
 using SkiaSharp;
 
 namespace MauiApp.Rendering;
@@ -9,73 +10,173 @@ namespace MauiApp.Rendering;
 /// </summary>
 public sealed class BattleRenderer
 {
-    public float CellSize { get; private set; }
+    public const float DefaultCellSize = 32f;
+    /// <summary>放大后屏幕上每格至少这么大（像素），便于点选单位。</summary>
+    public const float MinScreenCellPx = 56f;
+    /// <summary>最大缩放时视口短边至少显示的格数。</summary>
+    public const float MaxZoomVisibleCells = 5f;
+
+    public float CellSize { get; private set; } = DefaultCellSize;
     public float OriginX { get; private set; }
     public float OriginY { get; private set; }
+    public float MapPixelWidth { get; private set; }
+    public float MapPixelHeight { get; private set; }
+
+    private readonly AssetCache _assets = GfxAssets.Cache;
+    private static readonly SKPaint SpritePaint = new() { IsAntialias = false };
 
     private static readonly SKColor Grass = new(0x3b, 0x4a, 0x2a);
     private static readonly SKColor GrassAlt = new(0x44, 0x55, 0x30);
     private static readonly SKColor GrassEdge = new(0x2c, 0x38, 0x20);
 
+    public static SKRect ComputeUnitBounds(BattleState state, float cellSize, float padCells = 4f)
+    {
+        var alive = state.Units.Where(u => u.IsAlive).ToList();
+        if (alive.Count == 0)
+            return SKRect.Create(0, 0, state.Width * cellSize, state.Height * cellSize);
+
+        int minC = alive.Min(u => u.Col), maxC = alive.Max(u => u.Col);
+        int minR = alive.Min(u => u.Row), maxR = alive.Max(u => u.Row);
+        float pad = padCells * cellSize;
+        return SKRect.Create(
+            minC * cellSize - pad,
+            minR * cellSize - pad,
+            (maxC - minC + 1) * cellSize + pad * 2,
+            (maxR - minR + 1) * cellSize + pad * 2);
+    }
+
+    /// <summary>根据视口计算战斗相机最大缩放（允许放大到战术级近景）。</summary>
+    public static float ComputeMaxZoom(float viewportW, float viewportH, float cellSize)
+    {
+        float shortSide = Math.Min(viewportW, viewportH);
+        float byCells = shortSide / (MaxZoomVisibleCells * cellSize);
+        float byMinPx = MinScreenCellPx / cellSize;
+        return Math.Max(30f, Math.Max(byCells, byMinPx));
+    }
+
+    public void ComputeLayout(BattleState state, float topBarH)
+    {
+        CellSize = DefaultCellSize;
+        MapPixelWidth = state.Width * CellSize;
+        MapPixelHeight = state.Height * CellSize;
+        OriginX = 0;
+        OriginY = topBarH;
+    }
+
     public void Draw(SKCanvas canvas, SKImageInfo info, BattleState state,
         BattleUnit? current, IReadOnlySet<(int Col, int Row)> reachable, IReadOnlySet<int> attackable,
-        BattleVfx vfx, float time)
+        BattleVfx vfx, float time, MapCamera camera, float topInset = 0)
     {
+        float barH = MathF.Min(54, info.Height * 0.12f) + topInset;
+        ComputeLayout(state, barH);
+
         canvas.Clear(new SKColor(0x12, 0x16, 0x10));
         if (state.Width == 0 || state.Height == 0) return;
 
-        float barH = MathF.Min(54, info.Height * 0.12f);
-        CellSize = Math.Min(info.Width / (float)state.Width, (info.Height - barH) / state.Height);
-        OriginX = (info.Width - CellSize * state.Width) / 2;
-        OriginY = barH + (info.Height - barH - CellSize * state.Height) / 2;
+        camera.Clamp(info.Width, info.Height - barH, MapPixelWidth, MapPixelHeight);
+        var view = BattleViewport.VisibleCells(state, info.Width, info.Height, camera, barH, CellSize);
+
+        canvas.Save();
+        canvas.Translate(0, barH);
+        canvas.Translate(-camera.OffsetX, -camera.OffsetY);
+        canvas.Scale(camera.Zoom);
 
         canvas.Save();
         canvas.Translate(vfx.Shake.X, vfx.Shake.Y);
 
-        DrawTerrain(canvas, state);
-        DrawHighlights(canvas, state, reachable, attackable, time);
-        DrawUnits(canvas, state, current, vfx);
-        DrawDying(canvas, vfx);
-        DrawFloatingTexts(canvas, vfx);
+        DrawTerrain(canvas, state, view);
+        DrawExitZones(canvas, state, view);
+        DrawHighlights(canvas, state, reachable, attackable, time, view);
+        DrawUnits(canvas, state, current, vfx, view);
+        DrawDying(canvas, vfx, view);
+        DrawFloatingTexts(canvas, vfx, view);
 
+        canvas.Restore();
         canvas.Restore();
 
         DrawTurnBar(canvas, info, state, current, barH);
     }
 
-    public (int Col, int Row)? HitTest(BattleState state, float x, float y)
+    public (int Col, int Row)? HitTest(BattleState state, float screenX, float screenY, MapCamera camera, float topBarH)
     {
         if (CellSize <= 0) return null;
-        int col = (int)((x - OriginX) / CellSize);
-        int row = (int)((y - OriginY) / CellSize);
+        ComputeLayout(state, topBarH);
+        float wx = (screenX + camera.OffsetX) / camera.Zoom;
+        float wy = (screenY - topBarH + camera.OffsetY) / camera.Zoom;
+        int col = (int)(wx / CellSize);
+        int row = (int)(wy / CellSize);
         return state.InBounds(col, row) ? (col, row) : null;
     }
 
     // ---------- 地形 ----------
-    private void DrawTerrain(SKCanvas canvas, BattleState state)
+    private void DrawTerrain(SKCanvas canvas, BattleState state, BattleViewport.CellRange view)
     {
         using var fill = new SKPaint { IsAntialias = false, Style = SKPaintStyle.Fill };
         using var edge = new SKPaint { IsAntialias = false, Color = GrassEdge, Style = SKPaintStyle.Stroke, StrokeWidth = 1 };
-        for (int c = 0; c < state.Width; c++)
-        for (int r = 0; r < state.Height; r++)
+
+        for (int c = view.Col0; c <= view.Col1; c++)
+        for (int r = view.Row0; r <= view.Row1; r++)
         {
             var rect = CellRect(c, r);
-            fill.Color = (c + r) % 2 == 0 ? Grass : GrassAlt;
-            canvas.DrawRect(rect, fill);
-            // 像素草点缀
-            if (((c * 7 + r * 13) % 5) == 0)
+            var terrain = state.GetTerrain(c, r);
+            var tile = _assets.Get(TerrainTileKey(terrain, c, r));
+            if (tile is not null)
+                canvas.DrawImage(tile, rect, AssetCache.Nearest, SpritePaint);
+            else
             {
-                fill.Color = GrassEdge;
-                float u = CellSize / 12f;
-                canvas.DrawRect(rect.Left + CellSize * 0.3f, rect.Top + CellSize * 0.6f, u, u, fill);
-                canvas.DrawRect(rect.Left + CellSize * 0.6f, rect.Top + CellSize * 0.35f, u, u, fill);
+                fill.Color = TerrainColor(terrain, c, r);
+                canvas.DrawRect(rect, fill);
             }
             canvas.DrawRect(rect, edge);
         }
     }
 
+    private static string TerrainTileKey(BattleTerrain t, int c, int r) => t switch
+    {
+        BattleTerrain.Forest => GfxKeys.Forest,
+        BattleTerrain.Water => GfxKeys.Water,
+        BattleTerrain.Mountain => GfxKeys.Mountain,
+        BattleTerrain.Road => GfxKeys.Road,
+        BattleTerrain.Fort => GfxKeys.Fort,
+        _ => (c + r) % 2 == 0 ? GfxKeys.GrassA : GfxKeys.GrassB,
+    };
+
+    private static SKColor TerrainColor(BattleTerrain t, int c, int r) => t switch
+    {
+        BattleTerrain.Forest => new SKColor(0x2a, 0x4a, 0x28),
+        BattleTerrain.Water => new SKColor(0x2a, 0x4a, 0x7a),
+        BattleTerrain.Mountain => new SKColor(0x5a, 0x52, 0x48),
+        BattleTerrain.Road => new SKColor(0x6a, 0x5a, 0x3a),
+        BattleTerrain.Fort => new SKColor(0x4a, 0x48, 0x42),
+        _ => (c + r) % 2 == 0 ? new SKColor(0x3b, 0x4a, 0x2a) : new SKColor(0x44, 0x55, 0x30),
+    };
+
+    private void DrawExitZones(SKCanvas canvas, BattleState state, BattleViewport.CellRange view)
+    {
+        using var fill = new SKPaint { IsAntialias = false, Style = SKPaintStyle.Fill };
+        using var edge = new SKPaint { IsAntialias = false, Style = SKPaintStyle.Stroke, StrokeWidth = 2 };
+
+        for (int c = view.Col0; c <= view.Col1; c++)
+        for (int r = view.Row0; r <= view.Row1; r++)
+        {
+            if (!state.IsExitTile(BattleSide.Attacker, c, r) && !state.IsExitTile(BattleSide.Defender, c, r))
+                continue;
+
+            var rect = CellRect(c, r);
+            rect.Inflate(-1, -1);
+            bool atk = state.IsExitTile(BattleSide.Attacker, c, r);
+            fill.Color = atk
+                ? new SKColor(0xe8, 0xb9, 0x48, 0x28)
+                : new SKColor(0xc0, 0x60, 0x90, 0x28);
+            canvas.DrawRect(rect, fill);
+            edge.Color = atk ? new SKColor(0xe8, 0xb9, 0x48, 0x90) : new SKColor(0xff, 0x90, 0xb0, 0x90);
+            canvas.DrawRect(rect, edge);
+        }
+    }
+
     private void DrawHighlights(SKCanvas canvas, BattleState state,
-        IReadOnlySet<(int, int)> reachable, IReadOnlySet<int> attackable, float time)
+        IReadOnlySet<(int, int)> reachable, IReadOnlySet<int> attackable, float time,
+        BattleViewport.CellRange view)
     {
         float pulse = 0.5f + 0.5f * MathF.Sin(time * 4f);
         using var reach = new SKPaint { IsAntialias = false, Style = SKPaintStyle.Fill };
@@ -83,6 +184,7 @@ public sealed class BattleRenderer
 
         foreach (var (c, r) in reachable)
         {
+            if (!BattleViewport.Contains(view, c, r)) continue;
             var rect = CellRect(c, r);
             rect.Inflate(-1, -1);
             reach.Color = new SKColor(0x4c, 0x8a, 0xff, (byte)(40 + 30 * pulse));
@@ -94,6 +196,7 @@ public sealed class BattleRenderer
         using var atk = new SKPaint { IsAntialias = false, Style = SKPaintStyle.Stroke, StrokeWidth = 3 };
         foreach (var u in state.Units.Where(u => u.IsAlive && attackable.Contains(u.Id)))
         {
+            if (!BattleViewport.Contains(view, u.Col, u.Row)) continue;
             var rect = CellRect(u.Col, u.Row);
             rect.Inflate(-2, -2);
             atk.Color = new SKColor(0xff, 0x6a, 0x3a, (byte)(150 + 90 * pulse));
@@ -102,29 +205,32 @@ public sealed class BattleRenderer
     }
 
     // ---------- 单位 ----------
-    private void DrawUnits(SKCanvas canvas, BattleState state, BattleUnit? current, BattleVfx vfx)
+    private void DrawUnits(SKCanvas canvas, BattleState state, BattleUnit? current, BattleVfx vfx,
+        BattleViewport.CellRange view)
     {
         foreach (var u in state.Units.Where(u => u.IsAlive).OrderBy(u => u.Row).ThenBy(u => u.Col))
         {
+            if (!BattleViewport.Contains(view, u.Col, u.Row)) continue;
             var off = vfx.OffsetOf(u.Id);
-            float cx = OriginX + (u.Col + 0.5f + off.X) * CellSize;
-            float cy = OriginY + (u.Row + 0.5f + off.Y) * CellSize;
+            float cx = (u.Col + 0.5f + off.X) * CellSize;
+            float cy = (u.Row + 0.5f + off.Y) * CellSize;
 
             bool facingRight = FacingRight(state, u);
             bool isCurrent = current is not null && current.Id == u.Id;
-            DrawUnitSprite(canvas, cx, cy, u.Side, u.IsGeneral, facingRight, vfx.FlashOf(u.Id), 1f, isCurrent);
+            DrawUnitSprite(canvas, cx, cy, u, facingRight, vfx.FlashOf(u.Id), 1f, isCurrent);
             DrawHpBar(canvas, cx, cy, u.MaxHp > 0 ? (float)u.CurHp / u.MaxHp : 0f);
             if (u.IsGeneral) DrawName(canvas, cx, cy, u.Name);
         }
     }
 
-    private void DrawDying(SKCanvas canvas, BattleVfx vfx)
+    private void DrawDying(SKCanvas canvas, BattleVfx vfx, BattleViewport.CellRange view)
     {
         foreach (var d in vfx.Dying)
         {
-            float cx = OriginX + (d.Col + 0.5f) * CellSize;
-            float cy = OriginY + (d.Row + 0.5f) * CellSize;
-            DrawUnitSprite(canvas, cx, cy, d.Side, d.IsGeneral, true, 0f, d.Alpha, false);
+            if (!BattleViewport.Contains(view, d.Col, d.Row)) continue;
+            float cx = (d.Col + 0.5f) * CellSize;
+            float cy = (d.Row + 0.5f) * CellSize;
+            DrawUnitSprite(canvas, cx, cy, d.Side, d.IsGeneral, true, 0f, d.Alpha, false, null);
         }
     }
 
@@ -135,7 +241,79 @@ public sealed class BattleRenderer
         return enemy is null ? u.Side == BattleSide.Attacker : enemy.Col >= u.Col;
     }
 
+    private static string UnitSpriteKey(BattleSide side, bool general) => (side, general) switch
+    {
+        (BattleSide.Attacker, true) => GfxKeys.GeneralAtk,
+        (BattleSide.Attacker, false) => GfxKeys.SoldierAtk,
+        (BattleSide.Defender, true) => GfxKeys.GeneralDef,
+        _ => GfxKeys.SoldierDef,
+    };
+
+    private void DrawUnitSprite(SKCanvas canvas, float cx, float cy, BattleUnit u,
+        bool facingRight, float flash, float alpha, bool current)
+    {
+        string? portraitKey = u.IsGeneral && u.GeneralTemplateId is not null
+            ? GfxKeys.Portrait(u.GeneralTemplateId)
+            : null;
+        DrawUnitSprite(canvas, cx, cy, u.Side, u.IsGeneral, facingRight, flash, alpha, current, portraitKey);
+    }
+
     private void DrawUnitSprite(SKCanvas canvas, float cx, float cy,
+        BattleSide side, bool general, bool facingRight, float flash, float alpha, bool current,
+        string? portraitKey)
+    {
+        float s = CellSize;
+        var sprite = _assets.Get(UnitSpriteKey(side, general));
+        if (sprite is not null)
+        {
+            float scale = general ? 1.15f : 1f;
+            float w = s * scale, h = s * scale;
+            var dest = new SKRect(cx - w / 2, cy - h / 2 - s * 0.05f, cx + w / 2, cy + h / 2 - s * 0.05f);
+            if (current)
+            {
+                using var ring = new SKPaint { IsAntialias = false, Color = new SKColor(0xff, 0xd1, 0x40, 200) };
+                canvas.DrawOval(new SKRect(cx - s * 0.35f, cy + s * 0.28f, cx + s * 0.35f, cy + s * 0.48f), ring);
+            }
+            if (!facingRight)
+            {
+                canvas.Save();
+                canvas.Translate(cx, cy);
+                canvas.Scale(-1, 1);
+                canvas.Translate(-cx, -cy);
+                canvas.DrawImage(sprite, dest, AssetCache.Nearest, SpritePaint);
+                canvas.Restore();
+            }
+            else
+                canvas.DrawImage(sprite, dest, AssetCache.Nearest, SpritePaint);
+
+            if (general && portraitKey is not null)
+            {
+                var portrait = _assets.Get(portraitKey);
+                if (portrait is not null)
+                {
+                    float ps = s * 0.42f;
+                    var prect = new SKRect(cx - ps / 2, cy - s * 0.38f, cx + ps / 2, cy - s * 0.38f + ps);
+                    canvas.DrawImage(portrait, prect, AssetCache.Nearest, SpritePaint);
+                }
+            }
+
+            if (flash > 0.01f)
+            {
+                using var p = new SKPaint { IsAntialias = false, Style = SKPaintStyle.Fill };
+                p.Color = new SKColor(0xff, 0xff, 0xff, (byte)(200 * Math.Clamp(flash, 0, 1)));
+                canvas.DrawRect(dest, p);
+            }
+            return;
+        }
+
+        DrawUnitSpriteProcedural(canvas, cx, cy, side, general, facingRight, flash, alpha, current);
+    }
+
+    private void DrawUnitSprite(SKCanvas canvas, float cx, float cy,
+        BattleSide side, bool general, bool facingRight, float flash, float alpha, bool current)
+        => DrawUnitSprite(canvas, cx, cy, side, general, facingRight, flash, alpha, current, null);
+
+    private void DrawUnitSpriteProcedural(SKCanvas canvas, float cx, float cy,
         BattleSide side, bool general, bool facingRight, float flash, float alpha, bool current)
     {
         float s = CellSize;
@@ -228,12 +406,15 @@ public sealed class BattleRenderer
         canvas.DrawText(name, cx, y, SKTextAlign.Center, font, text);
     }
 
-    private void DrawFloatingTexts(SKCanvas canvas, BattleVfx vfx)
+    private void DrawFloatingTexts(SKCanvas canvas, BattleVfx vfx, BattleViewport.CellRange view)
     {
         foreach (var ft in vfx.Texts)
         {
-            float x = OriginX + ft.X * CellSize;
-            float y = OriginY + ft.Y * CellSize;
+            int col = (int)ft.X;
+            int row = (int)ft.Y;
+            if (!BattleViewport.Contains(view, col, row)) continue;
+            float x = ft.X * CellSize;
+            float y = ft.Y * CellSize;
             float size = MathF.Max(12, CellSize * ft.SizeFactor);
             using var font = new SKFont(PixelFont.Typeface, size);
             byte a = (byte)(255 * ft.Alpha);
@@ -274,8 +455,24 @@ public sealed class BattleRenderer
             if (u.IsGeneral) p.Color = u.Side == BattleSide.Attacker ? new SKColor(0x2f, 0x6f, 0xed) : new SKColor(0xb0, 0x3a, 0x8a);
             canvas.DrawRect(rect, p);
 
-            string label = u.IsGeneral ? u.Name.Substring(0, 1) : "兵";
-            canvas.DrawText(label, rect.MidX, rect.MidY + chip * 0.18f, SKTextAlign.Center, font, tp);
+            if (u.IsGeneral && u.GeneralTemplateId is not null)
+            {
+                var portrait = _assets.Get(GfxKeys.Portrait(u.GeneralTemplateId));
+                if (portrait is not null)
+                {
+                    var inner = new SKRect(rect.Left + 2, rect.Top + 2, rect.Right - 2, rect.Bottom - 2);
+                    canvas.DrawImage(portrait, inner, AssetCache.Nearest, SpritePaint);
+                }
+                else
+                {
+                    string label = u.Name.Length > 0 ? u.Name.Substring(0, 1) : "?";
+                    canvas.DrawText(label, rect.MidX, rect.MidY + chip * 0.18f, SKTextAlign.Center, font, tp);
+                }
+            }
+            else
+            {
+                canvas.DrawText("兵", rect.MidX, rect.MidY + chip * 0.18f, SKTextAlign.Center, font, tp);
+            }
 
             if (current is not null && current.Id == u.Id)
             {
@@ -288,8 +485,8 @@ public sealed class BattleRenderer
     }
 
     private SKRect CellRect(int col, int row) =>
-        new(OriginX + col * CellSize, OriginY + row * CellSize,
-            OriginX + (col + 1) * CellSize, OriginY + (row + 1) * CellSize);
+        new(col * CellSize, row * CellSize,
+            (col + 1) * CellSize, (row + 1) * CellSize);
 
     private static SKColor WithAlpha(SKColor c, byte a) => c.WithAlpha((byte)(c.Alpha * a / 255));
 }

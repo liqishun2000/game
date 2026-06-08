@@ -17,6 +17,8 @@ public sealed class GameState
 
     public string MapId { get; set; } = "";
 
+    public AiDifficulty Difficulty { get; set; } = AiDifficulty.Normal;
+
     /// <summary>小兵实例 id 自增序列。</summary>
     public int NextUnitId { get; set; } = 1;
 

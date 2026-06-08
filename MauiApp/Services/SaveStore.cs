@@ -22,6 +22,6 @@ public static class SaveStore
 
         string json = await File.ReadAllTextAsync(Path);
         var state = SaveService.Deserialize(json, content.Database);
-        return new GameSession(state, new DeterministicRandom(state.Seed + state.Month));
+        return new GameSession(state, new DeterministicRandom(state.Seed + state.Month), state.Difficulty);
     }
 }

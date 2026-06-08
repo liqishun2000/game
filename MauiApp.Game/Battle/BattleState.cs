@@ -31,4 +31,48 @@ public sealed class BattleState
 
     public bool InBounds(int col, int row) =>
         col >= 0 && row >= 0 && col < Width && row < Height;
+
+    /// <summary>各方入场区纵深（格数），用于撤退判定。</summary>
+    public int SpawnDepth { get; set; } = BattleFactory.DefaultSpawnDepth;
+
+    /// <summary>战场地形；null 时视为全平地。</summary>
+    public BattleTerrain[,]? Terrain { get; set; }
+
+    /// <summary>各方携带粮草（战斗内逐回合消耗）。</summary>
+    public Dictionary<BattleSide, int> SideFood { get; } = new();
+
+    /// <summary>各方连续断粮回合数。</summary>
+    public Dictionary<BattleSide, int> StarvationRounds { get; } = new();
+
+    public bool IsStarted { get; set; }
+
+    public BattleTerrain GetTerrain(int col, int row) =>
+        Terrain is not null && InBounds(col, row) ? Terrain[col, row] : BattleTerrain.Plain;
+
+    public static bool IsPassable(BattleTerrain t) =>
+        t is not BattleTerrain.Water and not BattleTerrain.Mountain;
+
+    public static int MoveCost(BattleTerrain t) => t switch
+    {
+        BattleTerrain.Forest => 2,
+        BattleTerrain.Mountain => 99,
+        BattleTerrain.Water => 99,
+        _ => 1,
+    };
+
+    /// <summary>该阵营的入场/撤退边缘区（进攻方左侧，防守方右侧）。</summary>
+    public bool IsExitTile(BattleSide side, int col, int row)
+    {
+        if (!InBounds(col, row) || !IsPassable(GetTerrain(col, row))) return false;
+        int depth = EffectiveSpawnDepth();
+        return side == BattleSide.Attacker ? col < depth : col >= Width - depth;
+    }
+
+    public int EffectiveSpawnDepth() => Math.Max(1, Math.Min(SpawnDepth, Width / 6));
+
+    public bool CanRetreat(BattleUnit unit) =>
+        unit.IsGeneral && unit.IsAlive && IsExitTile(unit.Side, unit.Col, unit.Row);
+
+    /// <summary>该格是否属于指定阵营的出生/布阵区。</summary>
+    public bool IsSpawnTile(BattleSide side, int col, int row) => IsExitTile(side, col, row);
 }

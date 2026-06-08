@@ -99,7 +99,8 @@ public class BattleEngineTests
             Units = s.Tiles["n_c1_t"].Units.ToList(),
         };
 
-        var battle = BattleFactory.CreateBattle(content, attacker, defender);
+        var battle = BattleFactory.CreateBattle(content, attacker, defender,
+            config: new BattleConfig { Width = 12, Height = 8, TerrainMode = "flat" });
         var engine = new BattleEngine(battle, new DeterministicRandom(99));
         engine.Start();
 
@@ -124,5 +125,25 @@ public class BattleEngineTests
 
         Assert.Equal(BattleOutcome.Timeout, result.Outcome);
         Assert.Equal(30, result.Rounds);
+    }
+
+    [Fact]
+    public void General_On_Exit_Edge_Can_Retreat()
+    {
+        var state = new BattleState { Width = 12, Height = 8, PlayerSide = BattleSide.Attacker, SpawnDepth = 2 };
+        var general = MakeUnit(1, BattleSide.Attacker, 0, 2, spd: 30, move: 4, hp: 200, pAtk: 50, pDef: 10);
+        general.IsGeneral = true;
+        general.GeneralTemplateId = "liubei";
+        general.Name = "刘备";
+        state.Units.Add(general);
+        state.Units.Add(MakeUnit(2, BattleSide.Defender, 10, 2, spd: 10, move: 4, hp: 200, pAtk: 40, pDef: 10));
+
+        var engine = new BattleEngine(state, new DeterministicRandom(1));
+        engine.Start();
+
+        Assert.True(state.CanRetreat(general));
+        Assert.True(engine.ExecuteRetreat());
+        Assert.Contains("liubei", engine.Result.EscapedGenerals);
+        Assert.False(general.IsAlive);
     }
 }

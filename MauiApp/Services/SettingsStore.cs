@@ -33,4 +33,13 @@ public static class SettingsStore
     /// <summary>某段引导是否已完成（key 如 "world.v1_countryside"、"battle"）。</summary>
     public static bool IsTutorialDone(string key) => Preferences.Get("tutorial.done." + key, false);
     public static void SetTutorialDone(string key) => Preferences.Set("tutorial.done." + key, true);
+
+    private const string KeyObjectivePanel = "ui.objectivePanel";
+
+    /// <summary>大地图关卡目标面板是否显示。</summary>
+    public static bool ShowObjectivePanel
+    {
+        get => Preferences.Get(KeyObjectivePanel, true);
+        set => Preferences.Set(KeyObjectivePanel, value);
+    }
 }

@@ -1,3 +1,4 @@
+using MauiApp.Game.Ai;
 using MauiApp.Game.Battle;
 using MauiApp.Game.Content;
 using MauiApp.Game.Model;
@@ -13,64 +14,114 @@ namespace MauiApp.Game.App;
 /// </summary>
 public sealed class GameSession
 {
+    private readonly WorldAi _worldAi = new();
+    private readonly Queue<PendingBattle> _pendingPlayerBattles = new();
+
     public GameState State { get; }
     public WorldEngine World { get; }
     public WarService War { get; }
     public PrisonService Prison { get; }
+    public EquipService Equip { get; }
     public IRandomSource Rng { get; }
     public AiDifficulty Difficulty { get; }
 
     public string PlayerFactionId { get; }
 
-    public GameSession(GameState state, IRandomSource rng, AiDifficulty difficulty = AiDifficulty.Normal)
+    public GameSession(GameState state, IRandomSource rng, AiDifficulty? difficulty = null)
     {
         State = state;
         Rng = rng;
-        Difficulty = difficulty;
+        Difficulty = difficulty ?? state.Difficulty;
+        state.Difficulty = Difficulty;
         World = new WorldEngine(state, rng);
         War = new WarService(state, rng);
         Prison = new PrisonService(state, rng);
+        Equip = new EquipService(state);
         PlayerFactionId = state.Factions.Values.First(f => f.Kind == FactionKind.Player).Id;
     }
 
     public static GameSession Start(ContentDatabase db, string mapId, int seed, AiDifficulty difficulty = AiDifficulty.Normal)
     {
         var state = GameStateFactory.CreateNewGame(db, mapId, seed);
+        state.Difficulty = difficulty;
         return new GameSession(state, new DeterministicRandom(seed), difficulty);
     }
 
     public FactionState PlayerFaction => State.Factions[PlayerFactionId];
 
     /// <summary>玩家发起进攻，返回待进行的战斗（UI 交互后调用 FinishBattle）。</summary>
-    public PendingBattle StartPlayerAttack(string attackerTileId, string defenderTileId)
+    public PendingBattle StartPlayerAttack(string attackerTileId, string defenderTileId, ExpeditionSetup setup)
     {
+        var validation = ExpeditionPlanner.Validate(State, attackerTileId, setup);
+        if (!validation.Success)
+            throw new InvalidOperationException(validation.Message);
+
         var atk = State.Tiles[attackerTileId];
         var pending = War.CreateBattle(
             attackerTileId, defenderTileId,
-            atk.Generals.Select(g => g.TemplateId),
-            atk.Units.Select(u => u.Id));
+            setup.GeneralTemplateIds,
+            setup.UnitWorldIds,
+            setup.CarriedFood,
+            awaitDeployment: true);
 
-        pending.Engine.SetController(BattleSide.Defender, new Ai.BattleAi(Difficulty));
-        pending.Engine.Start();
+        War.CommitBattleFood(pending);
+
+        foreach (var id in setup.GeneralTemplateIds)
+        {
+            var g = atk.Generals.First(x => x.TemplateId == id);
+            g.ActedThisMonth = true;
+        }
+
         return pending;
     }
 
     public void FinishBattle(PendingBattle pending) => War.ApplyResult(pending);
 
+    /// <summary>为交互式战斗配置 AI 并开局（玩家方由 UI 操控）。</summary>
+    public void BeginInteractiveBattle(PendingBattle pending)
+    {
+        var aiSide = pending.Engine.State.PlayerSide == BattleSide.Attacker
+            ? BattleSide.Defender
+            : BattleSide.Attacker;
+        pending.Engine.SetController(aiSide, new BattleAi(Difficulty));
+        pending.Engine.Start();
+    }
+
+    /// <summary>为交互式战斗配置 AI 并开局（玩家方由 UI 操控）。</summary>
+    [Obsolete("Use BeginInteractiveBattle after optional deployment.")]
+    public void PrepareInteractiveBattle(PendingBattle pending) => BeginInteractiveBattle(pending);
+
+    internal void EnqueuePlayerBattle(PendingBattle pending) => _pendingPlayerBattles.Enqueue(pending);
+
+    public bool HasPendingPlayerBattles => _pendingPlayerBattles.Count > 0;
+
+    public bool TryTakeNextPlayerBattle(out PendingBattle? pending)
+    {
+        if (_pendingPlayerBattles.Count == 0)
+        {
+            pending = null;
+            return false;
+        }
+
+        pending = _pendingPlayerBattles.Dequeue();
+        return true;
+    }
+
     /// <summary>结束玩家回合：AI 行动 -> 月结算。</summary>
     public MonthlyReport EndMonth()
     {
-        RunAiTurn();
-        return World.AdvanceMonth();
+        _worldAi.RunTurn(State, War, World, Difficulty, Rng, EnqueuePlayerBattle);
+        var report = World.AdvanceMonth();
+        report.AiActions.AddRange(_worldAi.ActionLogs);
+        return report;
     }
 
-    /// <summary>玩家可进攻的目标（相邻且非己方）。</summary>
+    /// <summary>玩家可进攻的目标（相邻且非己方，且有未行动武将）。</summary>
     public IEnumerable<TileState> AttackTargets(string tileId)
     {
         var tile = State.Tiles[tileId];
         if (tile.OwnerFactionId != PlayerFactionId) yield break;
-        bool hasForce = tile.Generals.Count > 0 || tile.Units.Count > 0;
-        if (!hasForce) yield break;
+        if (!tile.Generals.Any(g => !g.ActedThisMonth)) yield break;
 
         foreach (var id in tile.Adjacent)
         {
@@ -79,55 +130,4 @@ public sealed class GameSession
                 yield return t;
         }
     }
-
-    // ---- 简易世界 AI：招兵 + 对弱邻发起进攻 ----
-    private void RunAiTurn()
-    {
-        foreach (var faction in State.Factions.Values)
-        {
-            if (faction.Kind is FactionKind.Player or FactionKind.Rebel) continue;
-            AiRecruit(faction);
-            AiAttack(faction);
-        }
-    }
-
-    private void AiRecruit(FactionState faction)
-    {
-        string? basic = faction.Def.RecruitableUnitIds.FirstOrDefault(id =>
-            State.Content.Units.TryGetValue(id, out var u) && !u.IsSpecial);
-        if (basic is null) return;
-
-        foreach (var tile in State.TilesOf(faction.Id).Where(t => !t.IsRebelFixed && t.Generals.Count > 0))
-            World.Recruit(faction.Id, tile.Id, basic, 2);
-    }
-
-    private void AiAttack(FactionState faction)
-    {
-        foreach (var tile in State.TilesOf(faction.Id).ToList())
-        {
-            if (tile.IsRebelFixed) continue;
-            if (Power(tile) <= 0) continue;
-
-            foreach (var adjId in tile.Adjacent)
-            {
-                var target = State.Tiles[adjId];
-                if (target.OwnerFactionId == faction.Id) continue;
-                if (Power(tile) <= Power(target) * 1.3) continue;
-
-                var pending = War.CreateBattle(
-                    tile.Id, target.Id,
-                    tile.Generals.Select(g => g.TemplateId),
-                    tile.Units.Select(u => u.Id));
-                pending.Engine.SetController(BattleSide.Attacker, new Ai.BattleAi(Difficulty));
-                pending.Engine.SetController(BattleSide.Defender, new Ai.BattleAi(Difficulty));
-                pending.Engine.Start();
-                pending.Engine.FastResolveAll();
-                War.ApplyResult(pending);
-                break; // 每地块每回合至多一次进攻
-            }
-        }
-    }
-
-    private static double Power(TileState tile) =>
-        tile.Generals.Sum(g => g.Template.MapStats.Wuli + g.Template.MapStats.Tongshuai) + tile.Units.Count * 40;
 }

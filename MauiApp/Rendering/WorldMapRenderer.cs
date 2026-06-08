@@ -12,14 +12,22 @@ public sealed class WorldMapRenderer
 {
     public void Draw(SKCanvas canvas, SKImageInfo info, GameState state, MapLayout layout,
         string? selectedTileId, IReadOnlySet<string> attackTargets, float time,
-        IReadOnlyList<FloatingText>? feedback = null)
+        MapCamera camera, IReadOnlyList<FloatingText>? feedback = null)
     {
         DrawParchment(canvas, info);
         if (layout.Positions.Count == 0) return;
 
+        camera.Clamp(info.Width, info.Height, layout.ContentWidth, layout.ContentHeight);
+
+        canvas.Save();
+        canvas.Translate(-camera.OffsetX, -camera.OffsetY);
+        canvas.Scale(camera.Zoom);
+
         DrawRoads(canvas, state, layout);
         DrawNodes(canvas, state, layout, selectedTileId, attackTargets, time);
         if (feedback is not null) DrawFeedback(canvas, feedback);
+
+        canvas.Restore();
     }
 
     private static void DrawParchment(SKCanvas canvas, SKImageInfo info)

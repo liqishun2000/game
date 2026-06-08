@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:skia="clr-namespace:SkiaSharp.Views.Maui.Controls;assembly=SkiaSharp.Views.Maui.Controls"
              x:Class="MauiApp.Pages.BattlePage"
+             Shell.NavBarIsVisible="False"
              Title="战斗"
              BackgroundColor="{StaticResource PixelInk}">
 
@@ -14,19 +15,38 @@
                 <Label x:Name="StatusLabel" Style="{StaticResource PixelLabel}" FontSize="14" />
             </Border>
 
-            <skia:SKCanvasView Grid.Row="1"
-                               x:Name="BattleCanvas"
-                               EnableTouchEvents="True"
-                               PaintSurface="OnPaintSurface"
-                               Touch="OnCanvasTouch" />
+            <Grid Grid.Row="1">
+                <skia:SKCanvasView x:Name="BattleCanvas"
+                                   EnableTouchEvents="True"
+                                   PaintSurface="OnPaintSurface" />
+                <VerticalStackLayout HorizontalOptions="End" VerticalOptions="End" Margin="8"
+                                     Spacing="6" InputTransparent="False">
+                    <Button Text="＋" Style="{StaticResource PixelButton}" FontSize="18"
+                            Padding="12,4" WidthRequest="48" Clicked="OnZoomInClicked" />
+                    <Button Text="－" Style="{StaticResource PixelButton}" FontSize="18"
+                            Padding="12,4" WidthRequest="48" Clicked="OnZoomOutClicked" />
+                </VerticalStackLayout>
+            </Grid>
 
             <Border Grid.Row="2" Padding="10" BackgroundColor="{StaticResource PixelPanel}">
-                <HorizontalStackLayout Spacing="8" HorizontalOptions="Center">
-                    <Button x:Name="WaitButton" Text="待机" Style="{StaticResource PixelButton}" Clicked="OnWaitClicked" />
-                    <Button x:Name="FastTurnButton" Text="快进我方" Style="{StaticResource PixelButton}" Clicked="OnFastToPlayerClicked" />
-                    <Button x:Name="FastRoundButton" Text="快速回合" Style="{StaticResource PixelButton}" Clicked="OnFastRoundClicked" />
-                    <Button x:Name="AutoButton" Text="自动到底" Style="{StaticResource PixelButtonDanger}" Clicked="OnAutoClicked" />
-                </HorizontalStackLayout>
+                <VerticalStackLayout Spacing="8">
+                    <HorizontalStackLayout x:Name="DeployMenu" IsVisible="False" Spacing="8" HorizontalOptions="Center">
+                        <Button x:Name="AutoDeployButton" Text="自动布阵" Style="{StaticResource PixelButton}" Clicked="OnAutoDeployClicked" />
+                        <Button x:Name="StartBattleButton" Text="开始战斗" Style="{StaticResource PixelButtonPrimary}" Clicked="OnStartBattleClicked" />
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout x:Name="ActionMenu" IsVisible="False" Spacing="8" HorizontalOptions="Center">
+                        <Button x:Name="AttackButton" Text="攻击" Style="{StaticResource PixelButtonDanger}" Clicked="OnAttackMenuClicked" />
+                        <Button x:Name="SkillButton" Text="猛击" Style="{StaticResource PixelButton}" Clicked="OnSkillMenuClicked" />
+                        <Button x:Name="DetailButton" Text="详情" Style="{StaticResource PixelButton}" Clicked="OnDetailMenuClicked" />
+                        <Button x:Name="RetreatButton" Text="撤退" Style="{StaticResource PixelButton}" Clicked="OnRetreatClicked" />
+                        <Button x:Name="ActionWaitButton" Text="待机" Style="{StaticResource PixelButton}" Clicked="OnActionWaitClicked" />
+                    </HorizontalStackLayout>
+                    <HorizontalStackLayout x:Name="BattleTools" Spacing="8" HorizontalOptions="Center">
+                        <Button x:Name="FastTurnButton" Text="快进我方" Style="{StaticResource PixelButton}" Clicked="OnFastToPlayerClicked" />
+                        <Button x:Name="FastRoundButton" Text="快速回合" Style="{StaticResource PixelButton}" Clicked="OnFastRoundClicked" />
+                        <Button x:Name="AutoButton" Text="自动到底" Style="{StaticResource PixelButtonDanger}" Clicked="OnAutoClicked" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
             </Border>
         </Grid>
 
@@ -38,7 +58,7 @@
                 <VerticalStackLayout Spacing="12">
                     <Label Text="战斗操作" Style="{StaticResource PixelLabel}" TextColor="{StaticResource PixelGold}" FontSize="18" />
                     <Label Style="{StaticResource PixelLabel}" FontSize="15"
-                           Text="• 轮到我方单位（金圈）时，点蓝色高亮格移动。&#10;• 点红圈敌人即可就近移动并发起攻击。&#10;• 上方为行动序；可用底部按钮快进。&#10;击败敌方全部单位即获胜！" />
+                           Text="• 轮到我方单位（金圈）时，点蓝色高亮格移动。&#10;• 移动后可攻击/待机；武将退到己方入场边缘（地图两侧色带）可选「撤退」回城。&#10;• 上方为行动序；可用底部按钮快进。&#10;击败敌方全部单位即获胜！" />
                     <Button Text="明白了" Style="{StaticResource PixelButtonPrimary}" Clicked="OnBattleCoachClose" HorizontalOptions="End" />
                 </VerticalStackLayout>
             </Border>

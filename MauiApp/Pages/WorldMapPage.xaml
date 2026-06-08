@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:skia="clr-namespace:SkiaSharp.Views.Maui.Controls;assembly=SkiaSharp.Views.Maui.Controls"
              x:Class="MauiApp.Pages.WorldMapPage"
+             Shell.NavBarIsVisible="False"
              Title="大地图"
              BackgroundColor="{StaticResource PixelInk}">
 
@@ -11,30 +12,63 @@
 
         <skia:SKCanvasView Grid.Row="0" x:Name="HudCanvas" PaintSurface="OnPaintHud" />
 
-        <skia:SKCanvasView Grid.Row="1"
-                           x:Name="MapCanvas"
-                           EnableTouchEvents="True"
-                           PaintSurface="OnPaintSurface"
-                           Touch="OnCanvasTouch" />
+        <Grid Grid.Row="1">
+            <skia:SKCanvasView x:Name="MapCanvas"
+                               EnableTouchEvents="True"
+                               PaintSurface="OnPaintSurface" />
 
-        <!-- 关卡目标面板（常驻） -->
-        <Border Grid.Row="1" HorizontalOptions="Start" VerticalOptions="Start" Margin="10"
+            <!-- 地盘详情（点选地盘后点底部「详情」展开） -->
+            <Border x:Name="TileDetailPanel" ZIndex="10" IsVisible="False"
+                    VerticalOptions="End" HorizontalOptions="Fill" Margin="10,0,10,8"
+                    BackgroundColor="#ee241b14" Stroke="{StaticResource PixelGold}" StrokeThickness="2"
+                    Padding="14,12" MaximumHeightRequest="300">
+                <ScrollView>
+                    <VerticalStackLayout Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <Label x:Name="DetailTitle" Grid.Column="0" Style="{StaticResource PixelLabel}"
+                                   TextColor="{StaticResource PixelGold}" FontSize="16" />
+                            <Button Grid.Column="1" Text="×" Style="{StaticResource PixelButton}" FontSize="16" Padding="8,2"
+                                    Clicked="OnDetailClose" />
+                        </Grid>
+                        <Label x:Name="DetailOwner" Style="{StaticResource PixelLabel}" FontSize="13" />
+                        <Label Text="建筑" Style="{StaticResource PixelLabel}" TextColor="{StaticResource PixelGoldDark}" FontSize="12" />
+                        <VerticalStackLayout x:Name="DetailBuildings" Spacing="2" />
+                        <Label Text="武将" Style="{StaticResource PixelLabel}" TextColor="{StaticResource PixelGoldDark}" FontSize="12" />
+                        <VerticalStackLayout x:Name="DetailGenerals" Spacing="4" />
+                        <Label Text="驻军" Style="{StaticResource PixelLabel}" TextColor="{StaticResource PixelGoldDark}" FontSize="12" />
+                        <VerticalStackLayout x:Name="DetailUnits" Spacing="2" />
+                    </VerticalStackLayout>
+                </ScrollView>
+            </Border>
+
+        <!-- 关卡目标面板 -->
+        <Border x:Name="ObjectivePanel" HorizontalOptions="Start" VerticalOptions="Start" Margin="10" ZIndex="5"
                 BackgroundColor="#cc241b14" Stroke="{StaticResource PixelGoldDark}" StrokeThickness="2"
                 Padding="12,8">
-            <VerticalStackLayout x:Name="ObjectiveList" Spacing="4">
-                <Label Text="关卡目标" Style="{StaticResource PixelLabel}" TextColor="{StaticResource PixelGold}" FontSize="14" />
+            <VerticalStackLayout Spacing="4">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Label Grid.Column="0" Text="关卡目标" Style="{StaticResource PixelLabel}" TextColor="{StaticResource PixelGold}" FontSize="14" VerticalOptions="Center" />
+                    <Button Grid.Column="1" Text="×" Style="{StaticResource PixelButton}" FontSize="16" Padding="8,2"
+                            Clicked="OnObjectiveClose" VerticalOptions="Center" />
+                </Grid>
+                <VerticalStackLayout x:Name="ObjectiveList" Spacing="4" />
             </VerticalStackLayout>
         </Border>
+        </Grid>
 
         <Border Grid.Row="2" Padding="12" BackgroundColor="{StaticResource PixelPanel}"
                 Stroke="{StaticResource PixelGoldDark}" StrokeThickness="0">
             <VerticalStackLayout Spacing="10">
                 <Label x:Name="TileLabel" Style="{StaticResource PixelLabel}" FontSize="13" Text="点击地图选择地盘" />
                 <FlexLayout Wrap="Wrap" JustifyContent="Start" AlignItems="Center">
+                    <Button x:Name="ObjectiveButton" Text="目标" Style="{StaticResource PixelButton}" Clicked="OnObjectiveShow" IsVisible="False" Margin="0,0,8,8" />
+                    <Button x:Name="DetailButton" Text="详情" Style="{StaticResource PixelButton}" Clicked="OnDetailClicked" IsEnabled="False" Margin="0,0,8,8" />
                     <Button x:Name="BuildButton" Text="建造" Style="{StaticResource PixelButton}" Clicked="OnBuildClicked" IsEnabled="False" Margin="0,0,8,8" />
                     <Button x:Name="RecruitButton" Text="招兵" Style="{StaticResource PixelButton}" Clicked="OnRecruitClicked" IsEnabled="False" Margin="0,0,8,8" />
                     <Button x:Name="TechButton" Text="科技" Style="{StaticResource PixelButton}" Clicked="OnTechClicked" Margin="0,0,8,8" />
                     <Button x:Name="AttackButton" Text="出征" Style="{StaticResource PixelButtonDanger}" Clicked="OnAttackClicked" IsEnabled="False" Margin="0,0,8,8" />
+                    <Button x:Name="ArmoryButton" Text="武库" Style="{StaticResource PixelButton}" Clicked="OnArmoryClicked" Margin="0,0,8,8" />
+                    <Button x:Name="PrisonButton" Text="监狱" Style="{StaticResource PixelButton}" Clicked="OnPrisonClicked" IsVisible="False" Margin="0,0,8,8" />
                     <Button x:Name="SaveButton" Text="保存" Style="{StaticResource PixelButton}" Clicked="OnSaveClicked" Margin="0,0,8,8" />
                     <Button x:Name="EndTurnButton" Text="结束本月" Style="{StaticResource PixelButtonPrimary}" Clicked="OnEndTurnClicked" Margin="0,0,8,8" />
                 </FlexLayout>

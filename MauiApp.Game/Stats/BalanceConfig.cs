@@ -57,4 +57,9 @@ public sealed class BalanceConfig
 
     // ---- 战斗 ----
     public int BattleMaxRounds { get; init; } = 30;
+
+    /// <summary>战场每回合每单位粮草消耗（05 第 7 节）。</summary>
+    public int BattleFoodPerUnit { get; init; } = 2;
+
+    public int BattleStarvationMoraleLoss { get; init; } = 15;
 }

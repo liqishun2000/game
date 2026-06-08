@@ -36,6 +36,7 @@ public sealed class BattleEngine
     /// <summary>开始战斗（生成第一回合行动序）。</summary>
     public void Start()
     {
+        _state.IsStarted = true;
         _state.InitialSoldierCount[BattleSide.Attacker] = _state.AliveOf(BattleSide.Attacker).Count(u => !u.IsGeneral);
         _state.InitialSoldierCount[BattleSide.Defender] = _state.AliveOf(BattleSide.Defender).Count(u => !u.IsGeneral);
         _state.Round = 0;
@@ -63,28 +64,92 @@ public sealed class BattleEngine
         var unit = CurrentUnit();
         if (unit is null) return false;
 
+        if (turn.Retreat)
+            return ExecuteRetreat();
+
         if (turn.MoveTo is { } dest && (dest.Col != unit.Col || dest.Row != unit.Row))
         {
-            if (!GetReachable(unit).Contains(dest))
+            if (!ExecuteMove(dest.Col, dest.Row))
                 return false;
-            unit.Col = dest.Col;
-            unit.Row = dest.Row;
-            unit.HasMovedThisTurn = true;
         }
 
         if (turn.AttackTargetId is { } targetId)
+        {
+            if (!ExecuteAction(targetId, turn.SkillMultiplier))
+                return false;
+            return true;
+        }
+
+        if (turn.EndTurn)
+            ExecuteAction(null);
+        return true;
+    }
+
+    /// <summary>火焰纹章式：仅移动，不结束回合。</summary>
+    public bool ExecuteMove(int col, int row)
+    {
+        var unit = CurrentUnit();
+        if (unit is null || unit.HasMovedThisTurn) return false;
+        if (!GetReachable(unit).Contains((col, row))) return false;
+        unit.Col = col;
+        unit.Row = row;
+        unit.HasMovedThisTurn = true;
+        return true;
+    }
+
+    /// <summary>武将退至己方入场边缘后撤离战场，回写时保留在出发城池。</summary>
+    public bool ExecuteRetreat()
+    {
+        var unit = CurrentUnit();
+        if (unit is null || !_state.CanRetreat(unit)) return false;
+
+        unit.IsFleeing = true;
+        unit.CurHp = 0;
+        if (!_result.Fallen.Contains(unit.Id))
+            _result.Fallen.Add(unit.Id);
+
+        if (unit.GeneralTemplateId is { } tid)
+            _result.EscapedGenerals.Add(tid);
+
+        AdvanceAfterAction(unit);
+        return true;
+    }
+
+    public bool CanCurrentRetreat()
+    {
+        var unit = CurrentUnit();
+        return unit is not null && _state.CanRetreat(unit);
+    }
+
+    /// <summary>火焰纹章式：攻击或待机，结束单位回合。</summary>
+    public bool ExecuteAction(int? attackTargetId, double skillMul = 1.0)
+    {
+        var unit = CurrentUnit();
+        if (unit is null) return false;
+
+        if (attackTargetId is { } targetId)
         {
             var target = _state.GetUnit(targetId);
             if (target is null || !target.IsAlive || target.Side == unit.Side)
                 return false;
             if (Manhattan(unit, target) != 1)
                 return false;
-            ResolveAttack(unit, target);
+            ResolveAttack(unit, target, skillMul);
         }
 
         AdvanceAfterAction(unit);
         return true;
     }
+
+    /// <summary>相邻可攻击的敌方单位 id。</summary>
+    public HashSet<int> GetAttackable(BattleUnit unit) =>
+        _state.Units
+            .Where(u => u.IsAlive && u.Side != unit.Side && Manhattan(unit, u) == 1)
+            .Select(u => u.Id)
+            .ToHashSet();
+
+    /// <summary>为自动行动（AI/快进）决策单位回合。</summary>
+    public UnitTurn DecideAutoTurn(BattleUnit unit) => DecideAuto(unit);
 
     /// <summary>快进到下一个我方待决单位：自动替敌方（及空场）行动，遇到玩家单位停下。</summary>
     public void SkipToNextPlayerDecision()
@@ -164,6 +229,9 @@ public sealed class BattleEngine
     {
         if (CheckOutcome()) return;
 
+        ApplyFoodUpkeep();
+        if (CheckOutcome()) return;
+
         if (_state.Round >= _state.MaxRounds)
         {
             _result.Outcome = BattleOutcome.Timeout;
@@ -172,6 +240,60 @@ public sealed class BattleEngine
         }
 
         BeginRound();
+    }
+
+    private void ApplyFoodUpkeep()
+    {
+        foreach (var side in new[] { BattleSide.Attacker, BattleSide.Defender })
+        {
+            if (!_state.SideFood.ContainsKey(side))
+                continue;
+
+            var alive = _state.AliveOf(side).ToList();
+            if (alive.Count == 0) continue;
+
+            int cost = StatCalculator.BattleFoodCostPerRound(alive.Count, _balance);
+            int food = _state.SideFood.GetValueOrDefault(side, 0);
+
+            if (food >= cost)
+            {
+                _state.SideFood[side] = food - cost;
+                _state.StarvationRounds[side] = 0;
+                continue;
+            }
+
+            _state.SideFood[side] = 0;
+            int starvation = _state.StarvationRounds.GetValueOrDefault(side, 0) + 1;
+            _state.StarvationRounds[side] = starvation;
+
+            int commanderY = alive.Where(u => u.IsGeneral).Select(u => u.Yizhi).DefaultIfEmpty(50).Max();
+            StatCalculator.ApplyStarvationPenalties(alive, starvation, commanderY, _balance);
+
+            foreach (var u in alive.Where(u => u.CurHp <= 0))
+            {
+                if (!_result.Fallen.Contains(u.Id))
+                    _result.Fallen.Add(u.Id);
+                if (u.IsGeneral)
+                    HandleGeneralDown(u);
+            }
+        }
+    }
+
+    /// <summary>战前布阵：在己方出生区内移动单位。</summary>
+    public bool TryDeployUnit(int unitId, int col, int row)
+    {
+        if (_state.IsStarted) return false;
+        var unit = _state.GetUnit(unitId);
+        if (unit is null || !unit.IsAlive) return false;
+        if (!_state.IsSpawnTile(unit.Side, col, row)) return false;
+        if (!BattleState.IsPassable(_state.GetTerrain(col, row))) return false;
+
+        var occupant = _state.UnitAt(col, row);
+        if (occupant is not null && occupant.Id != unitId) return false;
+
+        unit.Col = col;
+        unit.Row = row;
+        return true;
     }
 
     private void PrunePending() =>
@@ -196,9 +318,9 @@ public sealed class BattleEngine
         return false;
     }
 
-    private void ResolveAttack(BattleUnit attacker, BattleUnit target)
+    private void ResolveAttack(BattleUnit attacker, BattleUnit target, double skillMul = 1.0)
     {
-        int dmg = ComputeDamage(attacker, target);
+        int dmg = ComputeDamage(attacker, target, skillMul);
         ApplyDamage(target, dmg);
 
         // 反击：目标存活且相邻则反击（近战）
@@ -258,9 +380,12 @@ public sealed class BattleEngine
             _result.Drops.Add(new DroppedEquipment { EquipmentId = general.EquipmentId, ToSide = capturerSide });
     }
 
-    /// <summary>BFS 计算单位可达格（不含被占据格，含原地）。</summary>
+    /// <summary>BFS 计算单位可达格（含移动力消耗与地形）。</summary>
     public HashSet<(int Col, int Row)> GetReachable(BattleUnit unit)
     {
+        if (unit.HasMovedThisTurn)
+            return new HashSet<(int, int)> { (unit.Col, unit.Row) };
+
         var result = new HashSet<(int, int)> { (unit.Col, unit.Row) };
         var dist = new Dictionary<(int, int), int> { [(unit.Col, unit.Row)] = 0 };
         var queue = new Queue<(int, int)>();
@@ -273,17 +398,24 @@ public sealed class BattleEngine
         {
             var (c, r) = queue.Dequeue();
             int d = dist[(c, r)];
-            if (d >= unit.Move) continue;
 
             for (int i = 0; i < 4; i++)
             {
                 var nc = c + dc[i];
                 var nr = r + dr[i];
                 if (!_state.InBounds(nc, nr)) continue;
-                if (dist.ContainsKey((nc, nr))) continue;
-                if (_state.UnitAt(nc, nr) is not null) continue; // 被占据不可进入
 
-                dist[(nc, nr)] = d + 1;
+                var terrain = _state.GetTerrain(nc, nr);
+                if (!BattleState.IsPassable(terrain)) continue;
+                if (_state.UnitAt(nc, nr) is not null) continue;
+
+                int cost = BattleState.MoveCost(terrain);
+                int nd = d + cost;
+                if (nd > unit.Move) continue;
+
+                if (dist.TryGetValue((nc, nr), out int existing) && existing <= nd) continue;
+
+                dist[(nc, nr)] = nd;
                 result.Add((nc, nr));
                 queue.Enqueue((nc, nr));
             }

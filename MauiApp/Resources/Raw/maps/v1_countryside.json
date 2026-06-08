@@ -72,5 +72,10 @@
     ["n_c3_t", "n_right1"],
     ["n_c3_b", "n_right1"]
   ],
-  "spawns": { "player": "n_left1", "ai": "n_right1" }
+  "spawns": { "player": "n_left1", "ai": "n_right1" },
+  "battleConfig": {
+    "width": 50,
+    "height": 50,
+    "terrainMode": "procedural_v1"
+  }
 }

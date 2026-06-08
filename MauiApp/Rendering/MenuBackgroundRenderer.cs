@@ -15,13 +15,9 @@ public sealed class MenuBackgroundRenderer
     public void Draw(SKCanvas canvas, SKImageInfo info, float t)
     {
         canvas.Clear(new SKColor(0x16, 0x11, 0x0d));
-        float scale = Math.Max(info.Width / (float)VW, info.Height / (float)VH);
-        float ox = (info.Width - VW * scale) / 2f;
-        float oy = (info.Height - VH * scale) / 2f;
-
+        // 横屏下拉伸铺满，避免 cover 裁切只露出天空条带
         canvas.Save();
-        canvas.Translate(ox, oy);
-        canvas.Scale(scale);
+        canvas.Scale(info.Width / (float)VW, info.Height / (float)VH);
 
         DrawSky(canvas);
         DrawSun(canvas, t);

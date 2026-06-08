@@ -24,6 +24,7 @@ public static class SaveService
             MapId = state.MapId,
             Month = state.Month,
             NextUnitId = state.NextUnitId,
+            Difficulty = state.Difficulty,
         };
 
         foreach (var f in state.Factions.Values)
@@ -73,6 +74,7 @@ public static class SaveService
         var state = GameStateFactory.CreateNewGame(content, dto.MapId, dto.Seed);
         state.Month = dto.Month;
         state.NextUnitId = dto.NextUnitId;
+        state.Difficulty = dto.Difficulty;
 
         foreach (var fd in dto.Factions)
         {
@@ -125,12 +127,13 @@ public static class SaveService
     {
         TemplateId = g.TemplateId, FactionId = g.FactionId, Level = g.Level, Exp = g.Exp,
         EquipmentId = g.EquipmentId, Status = g.Status, TileId = g.TileId, DetainedMonths = g.DetainedMonths,
+        ActedThisMonth = g.ActedThisMonth,
     };
 
     private static GeneralInstance FromGeneralDto(SaveGeneral g, ContentDatabase content) => new()
     {
         TemplateId = g.TemplateId, Template = content.Generals[g.TemplateId], FactionId = g.FactionId,
         Level = g.Level, Exp = g.Exp, EquipmentId = g.EquipmentId, Status = g.Status,
-        TileId = g.TileId, DetainedMonths = g.DetainedMonths,
+        TileId = g.TileId, DetainedMonths = g.DetainedMonths, ActedThisMonth = g.ActedThisMonth,
     };
 }

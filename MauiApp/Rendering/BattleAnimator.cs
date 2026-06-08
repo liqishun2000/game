@@ -8,6 +8,12 @@ namespace MauiApp.Rendering;
 /// </summary>
 public sealed class BattleAnimator
 {
+    private static readonly ObjectPool<FloatingText> TextPool = new(t => t.Clear());
+    private static readonly ObjectPool<DyingUnit> DyingPool = new(d =>
+    {
+        d.Alpha = 1f;
+    });
+
     private readonly AnimationClock _clock;
     private readonly Random _rng = new();
     private bool _decayRunning;
@@ -58,25 +64,31 @@ public sealed class BattleAnimator
         EnsureDecay();
         var color = crit ? new SKColor(0xff, 0xd1, 0x40)
             : friendlyTarget ? new SKColor(0xff, 0x8a, 0x7a) : new SKColor(0xff, 0xff, 0xff);
-        Vfx.Texts.Add(new FloatingText
-        {
-            Text = (crit ? "" : "") + dmg.ToString(),
-            Color = color,
-            X = col + 0.5f,
-            Y = row + 0.15f,
-            SizeFactor = crit ? 0.42f : 0.32f,
-            Life = 0.85f / SpeedScale,
-        });
+        var ft = TextPool.Rent();
+        ft.Text = dmg.ToString();
+        ft.Color = color;
+        ft.X = col + 0.5f;
+        ft.Y = row + 0.15f;
+        ft.SizeFactor = crit ? 0.42f : 0.32f;
+        ft.Life = 0.85f / SpeedScale;
+        ft.RiseSpeed = 1.1f;
+        ft.Age = 0;
+        Vfx.Texts.Add(ft);
     }
 
     public void SpawnLabel(int col, int row, string text, SKColor color)
     {
         EnsureDecay();
-        Vfx.Texts.Add(new FloatingText
-        {
-            Text = text, Color = color, X = col + 0.5f, Y = row - 0.1f,
-            SizeFactor = 0.36f, Life = 1.1f / SpeedScale, RiseSpeed = 0.7f,
-        });
+        var ft = TextPool.Rent();
+        ft.Text = text;
+        ft.Color = color;
+        ft.X = col + 0.5f;
+        ft.Y = row - 0.1f;
+        ft.SizeFactor = 0.36f;
+        ft.Life = 1.1f / SpeedScale;
+        ft.RiseSpeed = 0.7f;
+        ft.Age = 0;
+        Vfx.Texts.Add(ft);
     }
 
     public void Flash(int id)
@@ -97,16 +109,32 @@ public sealed class BattleAnimator
     public Task DieAsync(IReadOnlyList<DyingUnit> units)
     {
         if (units.Count == 0) return Task.CompletedTask;
-        foreach (var u in units) Vfx.Dying.Add(u);
+        var tracked = new List<DyingUnit>(units.Count);
+        foreach (var u in units)
+        {
+            var d = DyingPool.Rent();
+            d.Id = u.Id;
+            d.Col = u.Col;
+            d.Row = u.Row;
+            d.Side = u.Side;
+            d.IsGeneral = u.IsGeneral;
+            d.Alpha = 1f;
+            tracked.Add(d);
+            Vfx.Dying.Add(d);
+        }
         float dur = 0.34f / SpeedScale;
 
         return RunAsync(dur, t =>
         {
             float a = 1 - t;
-            foreach (var u in units) u.Alpha = a;
+            foreach (var u in tracked) u.Alpha = a;
         }, () =>
         {
-            foreach (var u in units) Vfx.Dying.Remove(u);
+            foreach (var u in tracked)
+            {
+                Vfx.Dying.Remove(u);
+                DyingPool.Return(u);
+            }
         });
     }
 
@@ -137,7 +165,11 @@ public sealed class BattleAnimator
         _clock.Add(dt =>
         {
             for (int i = Vfx.Texts.Count - 1; i >= 0; i--)
-                if (!Vfx.Texts[i].Advance(dt)) Vfx.Texts.RemoveAt(i);
+            {
+                if (Vfx.Texts[i].Advance(dt)) continue;
+                TextPool.Return(Vfx.Texts[i]);
+                Vfx.Texts.RemoveAt(i);
+            }
 
             if (Vfx.Flash.Count > 0)
                 foreach (var key in Vfx.Flash.Keys.ToList())

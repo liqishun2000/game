@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MauiApp.Pages.ExpeditionPage"
+             Shell.NavBarIsVisible="False"
+             Title="出征编队"
+             BackgroundColor="{StaticResource PixelInk}">
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="16,12">
+        <VerticalStackLayout Grid.Row="0" Spacing="6">
+            <Label x:Name="TitleLabel" Style="{StaticResource PixelLabel}"
+                   TextColor="{StaticResource PixelGold}" FontSize="18" />
+            <Label x:Name="SubtitleLabel" Style="{StaticResource PixelLabel}" FontSize="13" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <ProgressBar x:Name="PowerBar" Progress="0.5" HeightRequest="10"
+                             ProgressColor="{StaticResource PixelJade}" />
+                <Label x:Name="PowerLabel" Grid.Column="1" Style="{StaticResource PixelLabel}" FontSize="12" />
+            </Grid>
+        </VerticalStackLayout>
+
+        <ScrollView Grid.Row="1" Margin="0,10">
+            <VerticalStackLayout Spacing="12">
+                <Label Text="出征武将" Style="{StaticResource PixelLabel}" TextColor="{StaticResource PixelGoldDark}" FontSize="13" />
+                <VerticalStackLayout x:Name="GeneralList" Spacing="6" />
+
+                <Label Text="随行小兵" Style="{StaticResource PixelLabel}" TextColor="{StaticResource PixelGoldDark}" FontSize="13" />
+                <VerticalStackLayout x:Name="UnitList" Spacing="6" />
+
+                <Label Text="携带粮草" Style="{StaticResource PixelLabel}" TextColor="{StaticResource PixelGoldDark}" FontSize="13" />
+                <Label x:Name="FoodHintLabel" Style="{StaticResource PixelLabel}" FontSize="12" />
+                <Slider x:Name="FoodSlider" Minimum="0" Maximum="100" ValueChanged="OnFoodChanged" />
+                <Label x:Name="FoodValueLabel" Style="{StaticResource PixelLabel}" FontSize="13" />
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <HorizontalStackLayout Grid.Row="2" Spacing="10" HorizontalOptions="End" Margin="0,10,0,0">
+            <Button Text="取消" Style="{StaticResource PixelButton}" Clicked="OnCancelClicked" />
+            <Button Text="确认出征" Style="{StaticResource PixelButtonPrimary}" Clicked="OnConfirmClicked" />
+        </HorizontalStackLayout>
+    </Grid>
+
+</ContentPage>

@@ -17,6 +17,9 @@ public sealed class PendingBattle
     public required List<UnitInstance> AttackerUnits { get; init; }
     public required List<GeneralInstance> DefenderGenerals { get; init; }
     public required List<UnitInstance> DefenderUnits { get; init; }
+
+    /// <summary>玩家进攻时 true：进入战斗页先布阵再开战。</summary>
+    public bool AwaitDeployment { get; init; }
 }
 
 /// <summary>
@@ -37,7 +40,8 @@ public sealed class WarService
     /// <summary>校验相邻并构造一场战斗（防守方该地全部驻军上阵）。</summary>
     public PendingBattle CreateBattle(
         string attackerTileId, string defenderTileId,
-        IEnumerable<string> generalTemplateIds, IEnumerable<int> unitWorldIds)
+        IEnumerable<string> generalTemplateIds, IEnumerable<int> unitWorldIds,
+        int attackerFood = 0, int? defenderFood = null, bool awaitDeployment = false)
     {
         var atkTile = _state.Tiles[attackerTileId];
         var defTile = _state.Tiles[defenderTileId];
@@ -49,6 +53,9 @@ public sealed class WarService
 
         var atkGenerals = atkTile.Generals.Where(g => genIds.Contains(g.TemplateId)).ToList();
         var atkUnits = atkTile.Units.Where(u => unitIds.Contains(u.Id)).ToList();
+        if (atkGenerals.Count == 0)
+            throw new InvalidOperationException("出征必须至少携带一名武将");
+
         var defGenerals = defTile.Generals.ToList();
         var defUnits = defTile.Units.ToList();
 
@@ -59,12 +66,23 @@ public sealed class WarService
             ? BattleSide.Attacker
             : BattleSide.Defender;
 
+        var map = _state.Content.Maps[_state.MapId];
+        var battleCfg = map.BattleConfig ?? BattleConfig.Default50;
+        int terrainSeed = _state.Seed ^ HashCode.Combine(attackerTileId, defenderTileId, _state.Month);
+
         var battle = BattleFactory.CreateBattle(
             _state.Content,
             new BattleFactory.Side { FactionId = atkFactionId, Generals = atkGenerals, Units = atkUnits },
             new BattleFactory.Side { FactionId = defFactionId, Generals = defGenerals, Units = defUnits },
             playerSide,
-            balance: _state.Balance);
+            battleCfg,
+            terrainSeed,
+            _state.Balance);
+
+        int atkUnitCount = atkGenerals.Count + atkUnits.Count;
+        int defUnitCount = defGenerals.Count + defUnits.Count;
+        battle.SideFood[BattleSide.Attacker] = attackerFood;
+        battle.SideFood[BattleSide.Defender] = defenderFood ?? ResolveDefenderFood(defFactionId, defUnitCount);
 
         var engine = new BattleEngine(battle, _rng, _state.Balance);
 
@@ -79,7 +97,28 @@ public sealed class WarService
             AttackerUnits = atkUnits,
             DefenderGenerals = defGenerals,
             DefenderUnits = defUnits,
+            AwaitDeployment = awaitDeployment,
         };
+    }
+
+    private int ResolveDefenderFood(string defFactionId, int unitCount)
+    {
+        if (!_state.Factions.TryGetValue(defFactionId, out var faction)) return 0;
+        int perUnit = _state.Balance.BattleFoodPerUnit * 15;
+        return Math.Min(faction.Food, unitCount * perUnit);
+    }
+
+    /// <summary>从势力粮库扣除战斗携带粮草。</summary>
+    public void CommitBattleFood(PendingBattle pending)
+    {
+        DeductFood(pending.AttackerFactionId, pending.Engine.State.SideFood.GetValueOrDefault(BattleSide.Attacker));
+        DeductFood(pending.DefenderFactionId, pending.Engine.State.SideFood.GetValueOrDefault(BattleSide.Defender));
+    }
+
+    private void DeductFood(string factionId, int amount)
+    {
+        if (amount <= 0 || !_state.Factions.TryGetValue(factionId, out var faction)) return;
+        faction.Food = Math.Max(0, faction.Food - amount);
     }
 
     /// <summary>把战斗结果回写大地图。需在战斗结束后调用。</summary>

@@ -159,9 +159,17 @@ public sealed class WorldEngine
 
         AdvanceBuildings(report);
         AdvancePrison();
+        ResetGeneralActions();
 
         _state.Month++;
         return report;
+    }
+
+    private void ResetGeneralActions()
+    {
+        foreach (var tile in _state.Tiles.Values)
+            foreach (var g in tile.Generals)
+                g.ActedThisMonth = false;
     }
 
     private void ApplyFoodUpkeep(FactionState faction, FactionMonthSummary summary)

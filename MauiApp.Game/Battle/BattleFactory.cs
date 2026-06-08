@@ -8,6 +8,7 @@ namespace MauiApp.Game.Battle;
 public static class BattleFactory
 {
     public const int GeneralMove = 4;
+    public const int DefaultSpawnDepth = 8;
 
     public sealed class Side
     {
@@ -21,26 +22,38 @@ public static class BattleFactory
         Side attacker,
         Side defender,
         BattleSide playerSide = BattleSide.Attacker,
-        int width = 10,
-        int height = 8,
+        BattleConfig? config = null,
+        int terrainSeed = 0,
         BalanceConfig? balance = null)
     {
+        var cfg = config ?? BattleConfig.Default50;
         var b = balance ?? BalanceConfig.Default;
-        var state = new BattleState { Width = width, Height = height, PlayerSide = playerSide };
-        int idSeq = 1;
+        int depth = Math.Min(DefaultSpawnDepth, cfg.Width / 6);
+        var state = new BattleState { Width = cfg.Width, Height = cfg.Height, PlayerSide = playerSide, SpawnDepth = depth };
+        state.Terrain = BattleTerrainGenerator.Generate(cfg.Width, cfg.Height, terrainSeed, cfg.TerrainMode);
 
+        int idSeq = 1;
         int attackerTs = attacker.Generals.Count == 0 ? 0 : attacker.Generals.Max(g => g.Template.MapStats.Tongshuai);
         int defenderTs = defender.Generals.Count == 0 ? 0 : defender.Generals.Max(g => g.Template.MapStats.Tongshuai);
 
         var attackerUnits = BuildSideUnits(content, b, attacker, BattleSide.Attacker, attackerTs, ref idSeq);
         var defenderUnits = BuildSideUnits(content, b, defender, BattleSide.Defender, defenderTs, ref idSeq);
-
-        Deploy(attackerUnits, LeftPositions(width, height), state);
-        Deploy(defenderUnits, RightPositions(width, height), state);
+        Deploy(attackerUnits, SpawnZone(state, left: true, depth), state);
+        Deploy(defenderUnits, SpawnZone(state, left: false, depth), state);
 
         state.Units.AddRange(attackerUnits);
         state.Units.AddRange(defenderUnits);
         return state;
+    }
+
+    private static IEnumerable<(int Col, int Row)> SpawnZone(BattleState state, bool left, int depth)
+    {
+        int c0 = left ? 0 : state.Width - depth;
+        int c1 = left ? depth : state.Width;
+        for (int c = c0; c < c1; c++)
+        for (int r = 0; r < state.Height; r++)
+            if (BattleState.IsPassable(state.GetTerrain(c, r)))
+                yield return (c, r);
     }
 
     private static List<BattleUnit> BuildSideUnits(
@@ -98,28 +111,28 @@ public static class BattleFactory
         return list;
     }
 
-    private static void Deploy(List<BattleUnit> units, IEnumerable<(int Col, int Row)> positions, BattleState _)
+    private static void Deploy(List<BattleUnit> units, IEnumerable<(int Col, int Row)> positions, BattleState state)
     {
         using var pos = positions.GetEnumerator();
         foreach (var u in units)
         {
-            if (!pos.MoveNext()) break;
-            u.Col = pos.Current.Col;
-            u.Row = pos.Current.Row;
+            while (pos.MoveNext())
+            {
+                if (state.UnitAt(pos.Current.Col, pos.Current.Row) is not null) continue;
+                u.Col = pos.Current.Col;
+                u.Row = pos.Current.Row;
+                break;
+            }
         }
     }
 
-    private static IEnumerable<(int, int)> LeftPositions(int width, int height)
+    /// <summary>将指定阵营单位重置为默认出生区布阵。</summary>
+    public static void AutoDeploySide(BattleState state, BattleSide side)
     {
-        for (int c = 0; c < width; c++)
-            for (int r = 0; r < height; r++)
-                yield return (c, r);
-    }
-
-    private static IEnumerable<(int, int)> RightPositions(int width, int height)
-    {
-        for (int c = width - 1; c >= 0; c--)
-            for (int r = 0; r < height; r++)
-                yield return (c, r);
+        int depth = state.EffectiveSpawnDepth();
+        bool left = side == BattleSide.Attacker;
+        var zone = SpawnZone(state, left, depth).ToList();
+        var units = state.Units.Where(u => u.IsAlive && u.Side == side).ToList();
+        Deploy(units, zone, state);
     }
 }
